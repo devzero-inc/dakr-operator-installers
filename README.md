@@ -1,4 +1,4 @@
-# Dynamic Adjustment or Kubernetes Resources Operator (DAKR)
+# Dynamic Adjustment of Kubernetes Resources Operator (DAKR)
 
 # DAKR Operator setup
 
