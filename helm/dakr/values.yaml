@@ -1,0 +1,56 @@
+nameOverride: ""
+fullnameOverride: ""
+
+
+image:
+  repository: devzeroinc
+  # This sets the pull policy for images.
+  pullPolicy: Always
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: "latest"
+
+imagePullSecrets: []
+
+operator:
+  image: dakr-operator
+  resources:
+    limits:
+      cpu: 500m
+      memory: 128Mi
+    requests:
+      cpu: 10m
+      memory: 64Mi
+  endpoint: "https://api.devzero.io/dakr"
+  clusterToken: "REPLACE WITH TOKEN"
+  clusterName: "REPLACE WITH CLUSTER NAME" 
+  port: 9443
+  debugPort: 8082
+  serviceAccount:
+    name: "dakr-operator-sa"
+    # Annotations for cloud provider IAM integration.
+    #
+    # For AWS EKS with IAM Roles for Service Accounts (IRSA):
+    # 1. Run the terraform module in terraform/aws/.
+    # 2. Set the annotation key to the output 'ksa_annotation_key_aws' (eks.amazonaws.com/role-arn).
+    # 3. Set the annotation value to the output 'operator_iam_role_arn'.
+    #
+    # For GCP GKE with Workload Identity:
+    # 1. Run the terraform module in terraform/gcp/.
+    # 2. Set the annotation key to the output 'ksa_annotation_key' (iam.gke.io/gcp-service-account).
+    # 3. Set the annotation value to the output 'gcp_service_account_email'.
+    #
+    # eks.amazonaws.com/role-arn: "arn:aws:iam::147899144864:role/kevin-test-eks-dakr-operator-sa-role"
+    #
+    # Example for AWS:
+    #   "eks.amazonaws.com/role-arn": "arn:aws:iam::YOUR_ACCOUNT_ID:role/YOUR_EKS_CLUSTER_NAME-dakr-operator-sa-role"
+    # Example for GCP:
+    #   "iam.gke.io/gcp-service-account": "your-gcp-sa-email@your-gcp-project-id.iam.gserviceaccount.com"
+    annotations:
+      # Replace with the appropriate key-value pair from your Terraform output
+      # (see instructions above)
+      "REPLACE WITH ANNOTATION KEY": "REPLACE WTIH ANNOTATION VALUE"
+
+
+webhook:
+  enabled: false
+  caBundle: ""  # Base64 encoded CA bundle for webhook

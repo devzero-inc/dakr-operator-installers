@@ -1,0 +1,235 @@
+{{- if .Values.webhook.enabled }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "dakr.fullname" . }}-webhook-cert-sa
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-5"
+  labels:
+    {{- include "dakr.labels" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "dakr.fullname" . }}-webhook-cert-role
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-5"
+  labels:
+    {{- include "dakr.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["create", "get", "update", "patch", "delete"]
+  - apiGroups: ["admissionregistration.k8s.io"]
+    resources: ["mutatingwebhookconfigurations"]
+    verbs: ["get", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "dakr.fullname" . }}-webhook-cert-rolebinding
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-5"
+  labels:
+    {{- include "dakr.labels" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "dakr.fullname" . }}-webhook-cert-sa
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: ClusterRole
+  name: {{ include "dakr.fullname" . }}-webhook-cert-role
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "dakr.fullname" . }}-webhook-cert-job-pre
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-4"
+  labels:
+    {{- include "dakr.labels" . | nindent 4 }}
+spec:
+  template:
+    spec:
+      serviceAccountName: {{ include "dakr.fullname" . }}-webhook-cert-sa
+      restartPolicy: OnFailure
+      containers:
+        - name: cert-generator
+          image: bitnami/kubectl:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              #!/bin/sh
+              set -e
+
+              WEBHOOK_NAME="{{ include "dakr.fullname" . }}"
+              NAMESPACE="{{ .Release.Namespace }}"
+              SECRET_NAME="{{ include "dakr.fullname" . }}-operator-tls"
+              CERT_DIR="/tmp/webhook-certs"
+
+              echo "Checking if secret $SECRET_NAME exists..."
+              if kubectl get secret "$SECRET_NAME" -n "$NAMESPACE" >/dev/null 2>&1; then
+                echo "Secret $SECRET_NAME already exists. Skipping certificate generation."
+                exit 0
+              fi
+
+              echo "Secret not found. Generating new TLS certificates..."
+              mkdir -p "$CERT_DIR"
+              cd "$CERT_DIR"
+
+              openssl genrsa -out ca.key 2048
+              openssl req -new -x509 -days 365 -key ca.key -subj "/C=US/CN=${WEBHOOK_NAME}-ca" -out ca.crt
+
+              openssl req -newkey rsa:2048 -nodes -keyout server.key -subj "/C=US/CN=${WEBHOOK_NAME}.${NAMESPACE}.svc" -out server.csr
+
+              echo "subjectAltName=DNS:${WEBHOOK_NAME}.${NAMESPACE}.svc" > san.ext
+              openssl x509 -req -extfile san.ext \
+                  -days 365 \
+                  -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial \
+                  -out server.crt
+              rm san.ext
+
+              echo "Storing new TLS certificates in secret $SECRET_NAME..."
+              kubectl create secret generic "$SECRET_NAME-ca" \
+                --from-file=ca.crt \
+                -n "$NAMESPACE"
+
+              kubectl create secret tls "$SECRET_NAME" \
+                --cert=server.crt \
+                --key=server.key \
+                -n "$NAMESPACE"
+
+              echo "TLS secret $SECRET_NAME created successfully."
+
+              rm -rf "$CERT_DIR"
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "dakr.fullname" . }}-webhook-cert-job-post
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "1"
+  labels:
+    {{- include "dakr.labels" . | nindent 4 }}
+spec:
+  template:
+    spec:
+      serviceAccountName: {{ include "dakr.fullname" . }}-webhook-cert-sa
+      restartPolicy: OnFailure
+      containers:
+        - name: webhook-patcher
+          image: bitnami/kubectl:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              #!/bin/sh
+              set -e
+
+              sleep 10
+
+              WEBHOOK_NAME="{{ include "dakr.fullname" . }}"
+              NAMESPACE="{{ .Release.Namespace }}"
+              SECRET_NAME="{{ include "dakr.fullname" . }}-operator-tls"
+              CA_SECRET_NAME="$SECRET_NAME-ca"
+
+              # Wait for the CA secret to be available
+              echo "Waiting for secret $CA_SECRET_NAME to be available..."
+              MAX_RETRY=20
+              RETRY_INTERVAL=5
+              for i in $(seq 1 $MAX_RETRY); do
+                if kubectl get secret "$CA_SECRET_NAME" -n "$NAMESPACE" &>/dev/null; then
+                  echo "Secret $CA_SECRET_NAME found!"
+                  break
+                fi
+                if [ $i -eq $MAX_RETRY ]; then
+                  echo "Timeout waiting for secret $CA_SECRET_NAME. Exiting."
+                  exit 1
+                fi
+                echo "Secret not ready yet. Retry $i/$MAX_RETRY. Waiting $RETRY_INTERVAL seconds..."
+                sleep $RETRY_INTERVAL
+              done
+
+              # Get CA bundle and verify it's not empty
+              echo "Retrieving CA bundle from secret..."
+              CA_BUNDLE_RAW=$(kubectl get secret "$CA_SECRET_NAME" -n "$NAMESPACE" -o jsonpath="{.data.ca\.crt}")
+              if [ -z "$CA_BUNDLE_RAW" ]; then
+                echo "ERROR: ca.crt not found in secret $CA_SECRET_NAME"
+                kubectl get secret "$CA_SECRET_NAME" -n "$NAMESPACE" -o yaml
+                exit 1
+              fi
+              
+              # Decode and re-encode to ensure proper format
+              echo "Decoding and re-encoding CA bundle..."
+              CA_BUNDLE=$(echo "$CA_BUNDLE_RAW" | base64 --decode | base64 -w 0)
+              if [ -z "$CA_BUNDLE" ]; then
+                echo "ERROR: Failed to process CA bundle - result is empty"
+                echo "Raw CA bundle from secret: $CA_BUNDLE_RAW"
+                exit 1
+              fi
+              
+              # Print the CA bundle for debugging
+              echo "CA bundle length: $(echo -n "$CA_BUNDLE" | wc -c) characters"
+              echo "First 20 characters of CA bundle: $(echo "$CA_BUNDLE" | head -c 20)..."
+              
+              # Wait for WebhookConfiguration
+              echo "Waiting for WebhookConfiguration to be available..."
+              for i in $(seq 1 $MAX_RETRY); do
+                if kubectl get mutatingwebhookconfiguration "$WEBHOOK_NAME" &>/dev/null; then
+                  echo "WebhookConfiguration found!"
+                  break
+                fi
+                if [ $i -eq $MAX_RETRY ]; then
+                  echo "Timeout waiting for WebhookConfiguration $WEBHOOK_NAME. Exiting."
+                  exit 1
+                fi
+                echo "Webhook not ready yet. Retry $i/$MAX_RETRY. Waiting $RETRY_INTERVAL seconds..."
+                sleep $RETRY_INTERVAL
+              done
+
+              # Save current state of webhook before patching
+              echo "Current state of webhook before patching:"
+              kubectl get mutatingwebhookconfiguration "$WEBHOOK_NAME" -o jsonpath="{.webhooks[0].clientConfig.caBundle}" | head -c 20
+              echo "..."
+              
+              # Patch the webhook with the CA bundle
+              echo "Patching MutatingWebhookConfiguration with updated CA Bundle..."
+              kubectl patch mutatingwebhookconfiguration "$WEBHOOK_NAME" \
+                --type='json' -p="[{\"op\": \"replace\", \"path\": \"/webhooks/0/clientConfig/caBundle\", \"value\":\"$CA_BUNDLE\"}]" || {
+                  echo "Failed to patch webhook. Dumping current state:"
+                  kubectl get mutatingwebhookconfiguration "$WEBHOOK_NAME" -o yaml
+                  exit 1
+              }
+
+              # Verify the patch was applied correctly
+              echo "Verifying patch was applied correctly..."
+              sleep 2
+              CURRENT_CA_BUNDLE=$(kubectl get mutatingwebhookconfiguration "$WEBHOOK_NAME" -o jsonpath="{.webhooks[0].clientConfig.caBundle}")
+              if [ -z "$CURRENT_CA_BUNDLE" ]; then
+                echo "ERROR: After patching, caBundle is still empty in webhook configuration"
+                kubectl get mutatingwebhookconfiguration "$WEBHOOK_NAME" -o yaml
+                exit 1
+              fi
+              
+              echo "Verification: CA bundle length in webhook: $(echo -n "$CURRENT_CA_BUNDLE" | wc -c) characters"
+              echo "First 20 characters of CA bundle in webhook: $(echo "$CURRENT_CA_BUNDLE" | head -c 20)..."
+              
+              if [ "$CA_BUNDLE" = "$CURRENT_CA_BUNDLE" ]; then
+                echo "SUCCESS: Webhook successfully patched with new CA certificate."
+              else
+                echo "WARNING: CA bundle in webhook doesn't match the expected value."
+                echo "This might indicate a patching issue or webhook controller manipulation."
+                echo "Will proceed but results might not be as expected."
+              fi 
+---
+{{- end }}

@@ -1,0 +1,27 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/*
+Dockerfile.cross
+
+*.test
+
+*.out
+
+*.terraform.lock.hcl
+terraform.tfstate
+terraform.tfstate.backup
+**/.terraform/*
+
+go.work
+
+!vendor/**/zz_generated.*
+
+.idea
+.vscode
+*.swp
+*.swo
+*~
