@@ -48,7 +48,7 @@ operator:
     annotations:
       # Replace with the appropriate key-value pair from your Terraform output
       # (see instructions above)
-      "eks.amazonaws.com/role-arn": "arn:aws:iam::710984755704:role/preproduction-dakr-operator-sa-role"
+      "REPLACE WITH ANNOTATION KEY": "REPLACE WTIH ANNOTATION VALUE"
 
 webhook:
   enabled: false
