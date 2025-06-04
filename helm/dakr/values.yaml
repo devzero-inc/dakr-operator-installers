@@ -20,7 +20,7 @@ operator:
     requests:
       cpu: 10m
       memory: 64Mi
-  endpoint: "https://api.devzero.io/dakr"
+  endpoint: "https://dakr.devzero.io"
   clusterToken: "REPLACE WITH TOKEN"
   clusterName: "REPLACE WITH CLUSTER NAME" 
   port: 9443
@@ -48,8 +48,7 @@ operator:
     annotations:
       # Replace with the appropriate key-value pair from your Terraform output
       # (see instructions above)
-      "REPLACE WITH ANNOTATION KEY": "REPLACE WTIH ANNOTATION VALUE"
-
+      "eks.amazonaws.com/role-arn": "arn:aws:iam::710984755704:role/preproduction-dakr-operator-sa-role"
 
 webhook:
   enabled: false
