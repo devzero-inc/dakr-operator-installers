@@ -25,7 +25,7 @@ webhooks:
         namespace: {{ .Release.Namespace }}
         name: {{ include "dakr.fullname" . }}-operator
         path: /mutate
-        port: 443
+        port: {{ .Values.operator.port | default 9443 }}
       caBundle: {{ .Values.webhook.caBundle }}
     admissionReviewVersions: ["v1"]
     sideEffects: None

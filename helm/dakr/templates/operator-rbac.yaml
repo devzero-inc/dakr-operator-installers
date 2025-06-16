@@ -26,6 +26,15 @@ rules:
 - apiGroups: ["batch"]
   resources: ["*"]
   verbs: ["get", "list", "watch", "update"]
+- apiGroups: ["dakr.devzero.io"]
+  resources: ["workloadrecommendations", "nodegrouprecommendations"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["dakr.devzero.io"]
+  resources: ["workloadrecommendations/status", "nodegrouprecommendations/status"]
+  verbs: ["get", "update", "patch"]
+- apiGroups: ["dakr.devzero.io"]
+  resources: ["workloadrecommendations/finalizers", "nodegrouprecommendations/finalizers"]
+  verbs: ["update"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

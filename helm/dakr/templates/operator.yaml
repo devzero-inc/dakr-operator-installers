@@ -86,10 +86,17 @@ spec:
           - name: tls
             mountPath: "/etc/tls"
             readOnly: true
+          - name: tls-ca
+            mountPath: "/etc/tls-ca"
+            readOnly: true
       volumes:
         - name: tls
           secret:
             secretName: {{ include "dakr.fullname" . }}-operator-tls
+            optional: true
+        - name: tls-ca
+          secret:
+            secretName: {{ include "dakr.fullname" . }}-operator-tls-ca
             optional: true
       serviceAccountName: {{ .Values.operator.serviceAccount.name }}
       terminationGracePeriodSeconds: 10
