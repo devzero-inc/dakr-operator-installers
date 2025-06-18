@@ -19,7 +19,7 @@ metadata:
 rules:
 - apiGroups: [""]
   resources: ["*"]
-  verbs: ["get", "list", "watch", "update"]
+  verbs: ["get", "list", "watch", "update", "patch", "create"]
 - apiGroups: ["apps"]
   resources: ["*"]
   verbs: ["get", "list", "watch", "update"]
@@ -35,6 +35,11 @@ rules:
 - apiGroups: ["dakr.devzero.io"]
   resources: ["workloadrecommendations/finalizers", "nodegrouprecommendations/finalizers"]
   verbs: ["update"]
+{{- if .Capabilities.APIVersions.Has "keda.sh/v1alpha1/ScaledObject" }}
+- apiGroups: ["keda.sh"]
+  resources: ["scaledobjects"]
+  verbs: ["get", "list", "update", "patch"]
+{{- end }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
