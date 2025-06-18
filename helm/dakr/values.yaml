@@ -23,6 +23,11 @@ operator:
   endpoint: "https://dakr.devzero.io"
   clusterToken: "REPLACE WITH TOKEN"
   clusterName: "REPLACE WITH CLUSTER NAME" 
+  # noCloudCreds: true # If true, operator will not attempt to perform node scaling operations, and will not require cloud credentials
+  # tokenFromConfigMap: # If clusterToken is not specified above, operator will read from below ConfigMap value
+  #   name: "devzero-zxporter-env-config" # Name of the ConfigMap
+  #   namespace: "devzero-zxporter"      # Namespace of the ConfigMap
+  #   key: "CLUSTER_TOKEN"               # Key in the ConfigMap's data to get the token
   port: 9443
   debugPort: 8082
   serviceAccount:
