@@ -5,13 +5,13 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "dakr.labels" . | nindent 4 }}
-    app.kubernetes.io/name: {{ include "dakr.fullname" . }}-operator
+    app.kubernetes.io/component: {{ include "dakr.fullname" . }}-operator
     control-plane: {{ include "dakr.fullname" . }}-operator
 spec:
   selector:
     matchLabels:
       {{- include "dakr.selectorLabels" . | nindent 6 }}
-      app.kubernetes.io/name: {{ include "dakr.fullname" . }}-operator
+      app.kubernetes.io/component: {{ include "dakr.fullname" . }}-operator
       control-plane: {{ include "dakr.fullname" . }}-operator
   replicas: 1
   template:
@@ -20,7 +20,7 @@ spec:
         kubectl.kubernetes.io/default-container: manager
       labels:
         {{- include "dakr.selectorLabels" . | nindent 8 }}
-        app.kubernetes.io/name: {{ include "dakr.fullname" . }}-operator
+        app.kubernetes.io/component: {{ include "dakr.fullname" . }}-operator
         control-plane: {{ include "dakr.fullname" . }}-operator
     spec:
       affinity:
@@ -53,6 +53,16 @@ spec:
           - --cluster-token={{ .Values.operator.clusterToken }}
           - --cluster-name={{ .Values.operator.clusterName }}
           - --debug-http-addr=:{{ .Values.operator.debugPort | default 8082 }}
+          {{- if .Values.operator.noCloudCreds }}
+          - --no-cloud-creds
+          {{- end }}
+        env:
+          - name: TOKEN_CONFIGMAP_NAME
+            value: {{ .Values.operator.tokenFromConfigMap.name | quote }}
+          - name: TOKEN_CONFIGMAP_NAMESPACE
+            value: {{ .Values.operator.tokenFromConfigMap.namespace | quote }}
+          - name: TOKEN_CONFIGMAP_KEY
+            value: {{ .Values.operator.tokenFromConfigMap.key | quote }}
         image: "{{ .Values.image.repository }}/{{ .Values.operator.image }}:{{ .Values.image.tag }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         name: manager
@@ -108,11 +118,11 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "dakr.labels" . | nindent 4 }}
-    app.kubernetes.io/name: {{ include "dakr.fullname" . }}-operator
+    app.kubernetes.io/component: {{ include "dakr.fullname" . }}-operator
     control-plane: {{ include "dakr.fullname" . }}-operator
 spec:
   selector:
-    app.kubernetes.io/name: {{ include "dakr.fullname" . }}-operator
+    app.kubernetes.io/component: {{ include "dakr.fullname" . }}-operator
     control-plane: {{ include "dakr.fullname" . }}-operator
   type: ClusterIP
   ports:
