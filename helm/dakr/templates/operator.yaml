@@ -56,6 +56,7 @@ spec:
           {{- if .Values.operator.noCloudCreds }}
           - --no-cloud-creds
           {{- end }}
+        {{- if .Values.operator.tokenFromConfigMap }}
         env:
           - name: TOKEN_CONFIGMAP_NAME
             value: {{ .Values.operator.tokenFromConfigMap.name | quote }}
@@ -63,6 +64,7 @@ spec:
             value: {{ .Values.operator.tokenFromConfigMap.namespace | quote }}
           - name: TOKEN_CONFIGMAP_KEY
             value: {{ .Values.operator.tokenFromConfigMap.key | quote }}
+        {{- end }}
         image: "{{ .Values.image.repository }}/{{ .Values.operator.image }}:{{ .Values.image.tag }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         name: manager
