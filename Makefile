@@ -74,9 +74,8 @@ build-ubuntu-cross:
 
 # CentOS builds
 build-centos:
-	@echo "Building for CentOS platforms..."
-	$(BUILD_SCRIPT) --os centos --version 7 --arch $(NATIVE_ARCH) --criu-version $(CRIU_VERSION) --netavark-version $(NETAVARK_VERSION)
-	$(BUILD_SCRIPT) --os centos --version 8 --arch $(NATIVE_ARCH) --criu-version $(CRIU_VERSION) --netavark-version $(NETAVARK_VERSION)
+	@echo "Building for CentOS Stream platforms..."
+	$(BUILD_SCRIPT) --os centos --version stream9 --arch $(NATIVE_ARCH) --criu-version $(CRIU_VERSION) --netavark-version $(NETAVARK_VERSION)
 
 # Fedora builds
 build-fedora:
@@ -171,7 +170,7 @@ docker-build:
 	@for os in ubuntu centos fedora amazonlinux rockylinux debian alpine rhel; do \
 		for version in $$(case $$os in \
 			ubuntu) echo "20.04 22.04 24.04" ;; \
-			centos) echo "7 8" ;; \
+			centos) echo "stream9" ;; \
 			fedora) echo "38 39 40" ;; \
 			amazonlinux) echo "2 2023" ;; \
 			rockylinux) echo "8 9" ;; \

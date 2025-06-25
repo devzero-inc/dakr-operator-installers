@@ -1,28 +1,30 @@
-# CentOS Dockerfile for building CRIU and Netavark
-ARG OS_VERSION=8
-FROM centos:${OS_VERSION}
+# CentOS Stream Dockerfile for building CRIU and Netavark
+ARG OS_VERSION=stream9
+FROM quay.io/centos/centos:${OS_VERSION}
 
+# Re-declare ARGs after FROM to make them available in this stage
+ARG OS_VERSION=stream9
 ARG CRIU_VERSION=latest
 ARG NETAVARK_VERSION=latest
 ARG TARGET_ARCH=amd64
 
-# Enable PowerTools/CRB repository for development packages
-RUN if [ "${OS_VERSION}" = "8" ]; then \
-        dnf config-manager --set-enabled powertools || \
-        dnf config-manager --set-enabled PowerTools || true; \
-    elif [ "${OS_VERSION}" = "7" ]; then \
-        yum-config-manager --enable extras || true; \
+# CentOS Stream repositories - only stream9 is currently supported
+RUN if [ "${OS_VERSION}" = "stream9" ]; then \
+        dnf config-manager --set-enabled crb || true; \
+    else \
+        echo "Error: CentOS Stream 8 has reached End of Life (May 31, 2024)." && \
+        echo "Only CentOS Stream 9 is supported. Please use --version stream9" && \
+        exit 1; \
     fi
 
 # Install EPEL repository
-RUN if [ "${OS_VERSION}" = "8" ]; then \
+RUN if [ "${OS_VERSION}" = "stream9" ]; then \
         dnf install -y epel-release; \
-    elif [ "${OS_VERSION}" = "7" ]; then \
-        yum install -y epel-release; \
     fi
 
 # Install base dependencies
-RUN if [ "${OS_VERSION}" = "8" ]; then \
+RUN if [ "${OS_VERSION}" = "stream9" ]; then \
+        echo "Installing packages for CentOS Stream ${OS_VERSION}..." && \
         dnf groupinstall -y "Development Tools" && \
         dnf install -y \
             pkg-config \
@@ -43,29 +45,16 @@ RUN if [ "${OS_VERSION}" = "8" ]; then \
             python3-protobuf \
             asciidoc \
             xmlto \
-            ca-certificates; \
-    elif [ "${OS_VERSION}" = "7" ]; then \
-        yum groupinstall -y "Development Tools" && \
-        yum install -y \
-            pkg-config \
-            git \
-            curl \
-            wget \
-            python3 \
-            python3-devel \
-            python3-pip \
-            protobuf-devel \
-            protobuf-c-devel \
-            libnl3-devel \
-            libnet-devel \
-            libcap-devel \
-            libaio-devel \
-            gnutls-devel \
-            python3-protobuf \
-            asciidoc \
-            xmlto \
-            ca-certificates; \
+            ca-certificates \
+            jq && \
+        echo "Package installation completed for CentOS Stream ${OS_VERSION}"; \
+    else \
+        echo "Unsupported CentOS version: '${OS_VERSION}'" && \
+        exit 1; \
     fi
+
+# Verify git installation
+RUN command -v git && git --version
 
 # Install Rust for Netavark
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
@@ -73,12 +62,12 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 
 # Set up cross-compilation if needed
 RUN if [ "$TARGET_ARCH" = "arm64" ] && [ "$(uname -m)" = "x86_64" ]; then \
-        if [ "${OS_VERSION}" = "8" ]; then \
+        if [ "${OS_VERSION}" = "stream9" ]; then \
             dnf install -y gcc-aarch64-linux-gnu; \
         fi && \
         rustup target add aarch64-unknown-linux-gnu; \
     elif [ "$TARGET_ARCH" = "amd64" ] && [ "$(uname -m)" = "aarch64" ]; then \
-        if [ "${OS_VERSION}" = "8" ]; then \
+        if [ "${OS_VERSION}" = "stream9" ]; then \
             dnf install -y gcc-x86_64-linux-gnu; \
         fi && \
         rustup target add x86_64-unknown-linux-gnu; \

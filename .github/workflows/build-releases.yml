@@ -126,23 +126,15 @@ jobs:
           #   arch: arm64
           #   runner: ubuntu-24.04-arm64
           
-          # CentOS/RHEL builds - AMD64
+          # CentOS Stream builds - AMD64
           - os: centos
-            version: "7"
-            arch: amd64
-            runner: ubuntu-latest
-          - os: centos
-            version: "8"
+            version: "stream9"
             arch: amd64
             runner: ubuntu-latest
           
-          # CentOS/RHEL builds - ARM64
+          # CentOS Stream builds - ARM64
           # - os: centos
-          #   version: "7"
-          #   arch: arm64
-          #   runner: ubuntu-24.04-arm64
-          # - os: centos
-          #   version: "8"
+          #   version: "stream9"
           #   arch: arm64
           #   runner: ubuntu-24.04-arm64
           
@@ -406,7 +398,7 @@ jobs:
             ### Supported Platforms
             Available binaries (check release assets for actual successful builds):
             - Ubuntu 20.04, 22.04, 24.04 (amd64, arm64)
-            - CentOS 7, 8 (amd64, arm64)
+            - CentOS Stream 9 (amd64, arm64)
             - Fedora 38, 39, 40 (amd64, arm64)
             - Amazon Linux 2, 2023 (amd64, arm64)
             - Rocky Linux 8, 9 (amd64, arm64)
