@@ -113,18 +113,18 @@ jobs:
             runner: ubuntu-latest
           
           # Ubuntu builds - ARM64
-          - os: ubuntu
-            version: "20.04"
-            arch: arm64
-            runner: ubuntu-24.04-arm64
-          - os: ubuntu
-            version: "22.04"
-            arch: arm64
-            runner: ubuntu-24.04-arm64
-          - os: ubuntu
-            version: "24.04"
-            arch: arm64
-            runner: ubuntu-24.04-arm64
+          # - os: ubuntu
+          #   version: "20.04"
+          #   arch: arm64
+          #   runner: ubuntu-24.04-arm64
+          # - os: ubuntu
+          #   version: "22.04"
+          #   arch: arm64
+          #   runner: ubuntu-24.04-arm64
+          # - os: ubuntu
+          #   version: "24.04"
+          #   arch: arm64
+          #   runner: ubuntu-24.04-arm64
           
           # CentOS/RHEL builds - AMD64
           - os: centos
@@ -137,14 +137,14 @@ jobs:
             runner: ubuntu-latest
           
           # CentOS/RHEL builds - ARM64
-          - os: centos
-            version: "7"
-            arch: arm64
-            runner: ubuntu-24.04-arm64
-          - os: centos
-            version: "8"
-            arch: arm64
-            runner: ubuntu-24.04-arm64
+          # - os: centos
+          #   version: "7"
+          #   arch: arm64
+          #   runner: ubuntu-24.04-arm64
+          # - os: centos
+          #   version: "8"
+          #   arch: arm64
+          #   runner: ubuntu-24.04-arm64
           
           # Fedora builds - AMD64
           - os: fedora
@@ -161,18 +161,18 @@ jobs:
             runner: ubuntu-latest
           
           # Fedora builds - ARM64
-          - os: fedora
-            version: "38"
-            arch: arm64
-            runner: ubuntu-24.04-arm64
-          - os: fedora
-            version: "39"
-            arch: arm64
-            runner: ubuntu-24.04-arm64
-          - os: fedora
-            version: "40"
-            arch: arm64
-            runner: ubuntu-24.04-arm64
+          # - os: fedora
+          #   version: "38"
+          #   arch: arm64
+          #   runner: ubuntu-24.04-arm64
+          # - os: fedora
+          #   version: "39"
+          #   arch: arm64
+          #   runner: ubuntu-24.04-arm64
+          # - os: fedora
+          #   version: "40"
+          #   arch: arm64
+          #   runner: ubuntu-24.04-arm64
           
           # Amazon Linux builds - AMD64
           - os: amazonlinux
@@ -185,14 +185,14 @@ jobs:
             runner: ubuntu-latest
           
           # Amazon Linux builds - ARM64
-          - os: amazonlinux
-            version: "2"
-            arch: arm64
-            runner: ubuntu-24.04-arm64
-          - os: amazonlinux
-            version: "2023"
-            arch: arm64
-            runner: ubuntu-24.04-arm64
+          # - os: amazonlinux
+          #   version: "2"
+          #   arch: arm64
+          #   runner: ubuntu-24.04-arm64
+          # - os: amazonlinux
+          #   version: "2023"
+          #   arch: arm64
+          #   runner: ubuntu-24.04-arm64
           
           # Rocky Linux builds - AMD64
           - os: rockylinux
@@ -205,14 +205,14 @@ jobs:
             runner: ubuntu-latest
           
           # Rocky Linux builds - ARM64
-          - os: rockylinux
-            version: "8"
-            arch: arm64
-            runner: ubuntu-24.04-arm64
-          - os: rockylinux
-            version: "9"
-            arch: arm64
-            runner: ubuntu-24.04-arm64
+          # - os: rockylinux
+          #   version: "8"
+          #   arch: arm64
+          #   runner: ubuntu-24.04-arm64
+          # - os: rockylinux
+          #   version: "9"
+          #   arch: arm64
+          #   runner: ubuntu-24.04-arm64
           
           # Debian builds - AMD64
           - os: debian
@@ -225,14 +225,14 @@ jobs:
             runner: ubuntu-latest
           
           # Debian builds - ARM64
-          - os: debian
-            version: "11"
-            arch: arm64
-            runner: ubuntu-24.04-arm64
-          - os: debian
-            version: "12"
-            arch: arm64
-            runner: ubuntu-24.04-arm64
+          # - os: debian
+          #   version: "11"
+          #   arch: arm64
+          #   runner: ubuntu-24.04-arm64
+          # - os: debian
+          #   version: "12"
+          #   arch: arm64
+          #   runner: ubuntu-24.04-arm64
           
           # Alpine builds - AMD64
           - os: alpine
@@ -245,14 +245,14 @@ jobs:
             runner: ubuntu-latest
           
           # Alpine builds - ARM64
-          - os: alpine
-            version: "3.18"
-            arch: arm64
-            runner: ubuntu-24.04-arm64
-          - os: alpine
-            version: "3.19"
-            arch: arm64
-            runner: ubuntu-24.04-arm64
+          # - os: alpine
+          #   version: "3.18"
+          #   arch: arm64
+          #   runner: ubuntu-24.04-arm64
+          # - os: alpine
+          #   version: "3.19"
+          #   arch: arm64
+          #   runner: ubuntu-24.04-arm64
           
           # RHEL builds - AMD64
           - os: rhel
@@ -269,18 +269,18 @@ jobs:
             runner: ubuntu-latest
           
           # RHEL builds - ARM64
-          - os: rhel
-            version: "7"
-            arch: arm64
-            runner: ubuntu-24.04-arm64
-          - os: rhel
-            version: "8"
-            arch: arm64
-            runner: ubuntu-24.04-arm64
-          - os: rhel
-            version: "9"
-            arch: arm64
-            runner: ubuntu-24.04-arm64
+          # - os: rhel
+          #   version: "7"
+          #   arch: arm64
+          #   runner: ubuntu-24.04-arm64
+          # - os: rhel
+          #   version: "8"
+          #   arch: arm64
+          #   runner: ubuntu-24.04-arm64
+          # - os: rhel
+          #   version: "9"
+          #   arch: arm64
+          #   runner: ubuntu-24.04-arm64
 
     runs-on: ${{ matrix.runner }}
 
