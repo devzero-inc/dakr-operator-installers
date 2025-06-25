@@ -23,7 +23,7 @@ RUN echo "Building for Amazon Linux version: ${OS_VERSION}"
 RUN if [ "${OS_VERSION}" = "2023" ]; then \
         dnf update -y && \
         dnf groupinstall -y "Development Tools" && \
-        dnf install -y \
+        dnf install -y --allowerasing \
             git \
             pkg-config \
             curl \
@@ -56,8 +56,6 @@ RUN if [ "${OS_VERSION}" = "2023" ]; then \
             python3 \
             python3-devel \
             python3-pip \
-            protobuf-devel \
-            protobuf-c-devel \
             libnl3-devel \
             libnet-devel \
             libcap-devel \
@@ -67,7 +65,24 @@ RUN if [ "${OS_VERSION}" = "2023" ]; then \
             asciidoc \
             xmlto \
             ca-certificates && \
-        yum clean all; \
+        yum clean all && \
+        echo "Installing newer protobuf for proto3 support..." && \
+        yum install -y autoconf automake libtool unzip && \
+        cd /tmp && \
+        curl -LO https://github.com/protocolbuffers/protobuf/releases/download/v21.12/protoc-21.12-linux-x86_64.zip && \
+        unzip protoc-21.12-linux-x86_64.zip -d /usr/local && \
+        rm protoc-21.12-linux-x86_64.zip && \
+        curl -LO https://github.com/protocolbuffers/protobuf/releases/download/v21.12/protobuf-cpp-3.21.12.tar.gz && \
+        tar -xzf protobuf-cpp-3.21.12.tar.gz && \
+        cd protobuf-3.21.12 && \
+        ./configure --prefix=/usr/local && \
+        make -j$(nproc) && \
+        make install && \
+        cd /tmp && \
+        rm -rf protobuf-3.21.12 protobuf-cpp-3.21.12.tar.gz && \
+        echo "/usr/local/lib" > /etc/ld.so.conf.d/protobuf.conf && \
+        ldconfig && \
+        /usr/local/bin/protoc --version; \
     else \
         echo "Unsupported Amazon Linux version: ${OS_VERSION}" && \
         exit 1; \
@@ -84,7 +99,7 @@ RUN if [ "${OS_VERSION}" = "2" ]; then \
 
 # Install Rust for Netavark
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-ENV PATH="/root/.cargo/bin:${PATH}"
+ENV PATH="/usr/local/bin:/root/.cargo/bin:${PATH}"
 
 # Set up cross-compilation if needed
 RUN if [ "$TARGET_ARCH" = "arm64" ] && [ "$(uname -m)" = "x86_64" ]; then \
@@ -98,6 +113,9 @@ RUN if [ "$TARGET_ARCH" = "arm64" ] && [ "$(uname -m)" = "x86_64" ]; then \
         fi && \
         rustup target add x86_64-unknown-linux-gnu; \
     fi
+
+# Verify protoc installation and version
+RUN command -v protoc && protoc --version && echo "protoc verification successful"
 
 WORKDIR /build
 
