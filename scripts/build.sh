@@ -222,8 +222,9 @@ BUILD_CONTEXT="$BUILD_DIR/context-$OS-$VERSION-$ARCH"
 mkdir -p "$BUILD_CONTEXT"
 
 # Copy build files to context
-cp -r "$BUILD_DIR"/* "$BUILD_CONTEXT/" 2>/dev/null || true
-cp "$SCRIPT_DIR"/* "$BUILD_CONTEXT/" 2>/dev/null || true
+cp "$DOCKERFILE_PATH" "$BUILD_CONTEXT/"
+cp "$SCRIPT_DIR/build.sh" "$BUILD_CONTEXT/"
+
 
 # Build the container using appropriate method
 IMAGE_TAG="dakr-builder:$OS-$VERSION-$ARCH"
@@ -312,6 +313,15 @@ for binary in criu netavark; do
         echo "✗ $binary: NOT FOUND"
     fi
 done
+
+echo "=== Runtime Verification ==="
+if [[ -x "$PLATFORM_OUTPUT/criu" ]]; then
+    "$PLATFORM_OUTPUT/criu" check || { echo "✗ CRIU failed to run"; exit 1; }
+fi
+
+if [[ -x "$PLATFORM_OUTPUT/netavark" ]]; then
+    "$PLATFORM_OUTPUT/netavark" --help || { echo "✗ Netavark failed to run"; exit 1; }
+fi
 
 # Create archive
 cd "$OUTPUT_PATH"

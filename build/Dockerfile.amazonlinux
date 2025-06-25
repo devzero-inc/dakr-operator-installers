@@ -2,21 +2,30 @@
 ARG OS_VERSION=2023
 FROM amazonlinux:${OS_VERSION}
 
+# Re-declare ARG after FROM since ARGs before FROM are in a different scope
+ARG OS_VERSION=2023
 ARG CRIU_VERSION=latest
 ARG NETAVARK_VERSION=latest
 ARG TARGET_ARCH=amd64
 
 # Install EPEL repository for Amazon Linux 2
 RUN if [ "${OS_VERSION}" = "2" ]; then \
-        yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm; \
+        yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm || \
+        amazon-linux-extras install epel -y || \
+        yum install -y epel-release || \
+        echo "Warning: Could not install EPEL, continuing without it"; \
     fi
+
+# Debug: Show the OS_VERSION being used
+RUN echo "Building for Amazon Linux version: ${OS_VERSION}"
 
 # Install base dependencies
 RUN if [ "${OS_VERSION}" = "2023" ]; then \
+        dnf update -y && \
         dnf groupinstall -y "Development Tools" && \
         dnf install -y \
-            pkg-config \
             git \
+            pkg-config \
             curl \
             wget \
             python3 \
@@ -37,10 +46,11 @@ RUN if [ "${OS_VERSION}" = "2023" ]; then \
             jq && \
         dnf clean all; \
     elif [ "${OS_VERSION}" = "2" ]; then \
+        yum update -y && \
         yum groupinstall -y "Development Tools" && \
         yum install -y \
-            pkg-config \
             git \
+            pkg-config \
             curl \
             wget \
             python3 \
@@ -58,7 +68,13 @@ RUN if [ "${OS_VERSION}" = "2023" ]; then \
             xmlto \
             ca-certificates && \
         yum clean all; \
+    else \
+        echo "Unsupported Amazon Linux version: ${OS_VERSION}" && \
+        exit 1; \
     fi
+
+# Verify git installation
+RUN command -v git && git --version
 
 # Install jq for Amazon Linux 2 (not available in base repos)
 RUN if [ "${OS_VERSION}" = "2" ]; then \

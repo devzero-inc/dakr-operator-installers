@@ -29,7 +29,8 @@ RUN apk add --no-cache \
     asciidoc \
     xmlto \
     ca-certificates \
-    musl-dev
+    musl-dev \
+    jq
 
 # Install Rust for Netavark
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
@@ -58,8 +59,7 @@ RUN mkdir -p criu && cd criu && \
     fi && \
     echo "Building CRIU version: $CRIU_VERSION" && \
     git clone --depth 1 --branch "$CRIU_VERSION" https://github.com/checkpoint-restore/criu.git . && \
-    # Alpine-specific build adjustments
-    export LDFLAGS="-static" && \
+    # Alpine-specific build adjustments (avoid static linking issues)
     if [ "$TARGET_ARCH" = "arm64" ] && [ "$(uname -m)" = "x86_64" ]; then \
         export ARCH=arm64; \
     elif [ "$TARGET_ARCH" = "amd64" ] && [ "$(uname -m)" = "aarch64" ]; then \
