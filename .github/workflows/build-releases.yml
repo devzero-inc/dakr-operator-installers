@@ -315,7 +315,7 @@ jobs:
   create-release:
     needs: [determine-versions, build-matrix]
     runs-on: ubuntu-latest
-    if: (github.event.inputs.create_release == 'true' || startsWith(github.ref, 'refs/tags/')) && always()
+    if: always() && (github.event.inputs.create_release == 'true' || startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/garvit/criu-netavark-releases')
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -433,7 +433,7 @@ jobs:
   update-documentation:
     needs: [determine-versions, create-release]
     runs-on: ubuntu-latest
-    if: github.event.inputs.create_release == 'true' || startsWith(github.ref, 'refs/tags/')
+    if: github.event.inputs.create_release == 'true' || startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/garvit/criu-netavark-releases'
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
