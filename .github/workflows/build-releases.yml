@@ -41,20 +41,49 @@ jobs:
         run: |
           # Determine CRIU version
           if [ "${{ env.CRIU_VERSION }}" = "latest" ]; then
-            CRIU_VER=$(curl -s https://api.github.com/repos/checkpoint-restore/criu/releases/latest | jq -r .tag_name)
+            CRIU_VER=$(curl -s https://api.github.com/repos/checkpoint-restore/criu/releases/latest | jq -r '.tag_name // empty')
+            # Fallback if jq returns null or empty
+            if [ -z "$CRIU_VER" ] || [ "$CRIU_VER" = "null" ]; then
+              CRIU_VER=$(curl -s https://api.github.com/repos/checkpoint-restore/criu/releases/latest | grep -o '"tag_name": "[^"]*' | cut -d'"' -f4)
+            fi
+            # Final fallback
+            if [ -z "$CRIU_VER" ] || [ "$CRIU_VER" = "null" ]; then
+              echo "Warning: Could not fetch latest CRIU version, using v3.19 as fallback"
+              CRIU_VER="v3.19"
+            fi
           else
             CRIU_VER="${{ env.CRIU_VERSION }}"
           fi
           
           # Determine Netavark version
           if [ "${{ env.NETAVARK_VERSION }}" = "latest" ]; then
-            NETAVARK_VER=$(curl -s https://api.github.com/repos/containers/netavark/releases/latest | jq -r .tag_name)
+            NETAVARK_VER=$(curl -s https://api.github.com/repos/containers/netavark/releases/latest | jq -r '.tag_name // empty')
+            # Fallback if jq returns null or empty
+            if [ -z "$NETAVARK_VER" ] || [ "$NETAVARK_VER" = "null" ]; then
+              NETAVARK_VER=$(curl -s https://api.github.com/repos/containers/netavark/releases/latest | grep -o '"tag_name": "[^"]*' | cut -d'"' -f4)
+            fi
+            # Final fallback
+            if [ -z "$NETAVARK_VER" ] || [ "$NETAVARK_VER" = "null" ]; then
+              echo "Warning: Could not fetch latest Netavark version, using v1.15.2 as fallback"
+              NETAVARK_VER="v1.15.2"
+            fi
           else
             NETAVARK_VER="${{ env.NETAVARK_VERSION }}"
           fi
           
           # Create release tag
           RELEASE_TAG="criu-${CRIU_VER}-netavark-${NETAVARK_VER}-$(date +%Y%m%d)"
+          
+          # Validate versions are not null or empty
+          if [ -z "$CRIU_VER" ] || [ "$CRIU_VER" = "null" ]; then
+            echo "ERROR: CRIU version is null or empty: '$CRIU_VER'"
+            exit 1
+          fi
+          
+          if [ -z "$NETAVARK_VER" ] || [ "$NETAVARK_VER" = "null" ]; then
+            echo "ERROR: Netavark version is null or empty: '$NETAVARK_VER'"
+            exit 1
+          fi
           
           echo "criu_version=${CRIU_VER}" >> $GITHUB_OUTPUT
           echo "netavark_version=${NETAVARK_VER}" >> $GITHUB_OUTPUT
@@ -212,12 +241,21 @@ jobs:
 
       - name: Build CRIU and Netavark
         run: |
+          # Determine if cross-build flag is needed
+          CROSS_BUILD_FLAG=""
+          if [ "${{ matrix.arch }}" = "arm64" ] && [ "$(uname -m)" = "x86_64" ]; then
+            CROSS_BUILD_FLAG="--cross-build"
+          elif [ "${{ matrix.arch }}" = "amd64" ] && [ "$(uname -m)" = "aarch64" ]; then
+            CROSS_BUILD_FLAG="--cross-build"
+          fi
+          
           ./scripts/build.sh \
             --os "${{ matrix.os }}" \
             --version "${{ matrix.version }}" \
             --arch "${{ matrix.arch }}" \
             --criu-version "${{ needs.determine-versions.outputs.criu_version }}" \
-            --netavark-version "${{ needs.determine-versions.outputs.netavark_version }}"
+            --netavark-version "${{ needs.determine-versions.outputs.netavark_version }}" \
+            $CROSS_BUILD_FLAG
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
