@@ -1,0 +1,247 @@
+# Red Hat Enterprise Linux Dockerfile for building CRIU and Netavark
+ARG OS_VERSION=8
+FROM registry.access.redhat.com/ubi${OS_VERSION}/ubi:latest
+
+# Re-declare build args that are used after FROM
+ARG OS_VERSION=8
+ARG CRIU_VERSION=latest
+ARG NETAVARK_VERSION=latest
+ARG TARGET_ARCH=amd64
+
+# Enable CodeReady Builder repository for development packages (RHEL 8+)
+RUN if [ "${OS_VERSION}" = "8" ] || [ "${OS_VERSION}" = "9" ]; then \
+        subscription-manager repos --enable codeready-builder-for-rhel-${OS_VERSION}-$(uname -m)-rpms 2>/dev/null || \
+        dnf config-manager --set-enabled codeready-builder-for-rhel-${OS_VERSION}-$(uname -m)-rpms 2>/dev/null || \
+        echo "Note: CodeReady Builder repository not available in UBI image"; \
+    elif [ "${OS_VERSION}" = "7" ]; then \
+        subscription-manager repos --enable rhel-7-server-optional-rpms 2>/dev/null || \
+        echo "Note: Optional repository not available in UBI image"; \
+    fi
+
+# Debug: Show the OS_VERSION that's being used
+RUN echo "Current OS_VERSION: ${OS_VERSION}"
+
+# Install EPEL repository and base dependencies with proper error handling
+RUN if [ "${OS_VERSION}" = "9" ]; then \
+        echo "Installing packages for RHEL 9..." && \
+        dnf update -y && \
+        dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm && \
+        /usr/bin/crb enable && \
+        echo "Installing essential build tools..." && \
+        dnf install -y \
+            make \
+            gcc \
+            gcc-c++ \
+            automake \
+            autoconf \
+            libtool \
+            cmake \
+            pkg-config \
+            git \
+            curl \
+            wget \
+            python3 \
+            python3-devel \
+            python3-pip \
+            ca-certificates \
+            jq \
+            protobuf-c-devel \
+            protobuf-c-compiler \
+            protobuf-compiler \
+            libcap-ng-devel \
+            python3-protobuf || echo "Warning: Some packages may not be available in EPEL/CRB"; \
+    elif [ "${OS_VERSION}" = "8" ]; then \
+        echo "Installing packages for RHEL 8..." && \
+        dnf update -y && \
+        dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm && \
+        /usr/bin/crb enable || true && \
+        echo "Installing essential build tools..." && \
+        dnf install -y \
+            make \
+            gcc \
+            gcc-c++ \
+            automake \
+            autoconf \
+            libtool \
+            cmake \
+            pkg-config \
+            git \
+            curl \
+            wget \
+            python3 \
+            python3-devel \
+            python3-pip \
+            ca-certificates \
+            jq \
+            protobuf-c-devel \
+            protobuf-c-compiler \
+            protobuf-compiler \
+            libcap-ng-devel \
+            python3-protobuf || echo "Warning: Some packages may not be available in EPEL/CRB"; \
+    elif [ "${OS_VERSION}" = "7" ]; then \
+        echo "Installing packages for RHEL 7..." && \
+        yum update -y && \
+        yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm && \
+        yum groupinstall -y "Development Tools" && \
+        yum install -y \
+            pkg-config \
+            git \
+            curl \
+            wget \
+            python3 \
+            python3-devel \
+            python3-pip \
+            protobuf-devel \
+            protobuf-c-devel \
+            libnl3-devel \
+            libnet-devel \
+            libcap-devel \
+            libaio-devel \
+            gnutls-devel \
+            libdrm-devel \
+            python3-protobuf \
+            asciidoc \
+            xmlto \
+            ca-certificates; \
+    else \
+        echo "Unknown OS_VERSION: ${OS_VERSION}. Falling back to default package installation." && \
+        dnf update -y && \
+        dnf install -y \
+            pkg-config \
+            git \
+            curl \
+            wget \
+            python3 \
+            python3-devel \
+            python3-pip \
+            ca-certificates \
+            jq; \
+    fi
+
+# Install jq for RHEL 7 manually if not available and verify installations
+RUN if [ "${OS_VERSION}" = "7" ]; then \
+        if ! command -v jq >/dev/null 2>&1; then \
+            curl -L https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o /usr/local/bin/jq && \
+            chmod +x /usr/local/bin/jq; \
+        fi; \
+    fi
+
+# Verify that required tools are available
+RUN command -v git >/dev/null 2>&1 || { echo "ERROR: git is not installed"; exit 1; }
+RUN command -v jq >/dev/null 2>&1 || { echo "ERROR: jq is not installed"; exit 1; }
+RUN command -v curl >/dev/null 2>&1 || { echo "ERROR: curl is not installed"; exit 1; }
+RUN command -v make >/dev/null 2>&1 || { echo "ERROR: make is not installed"; exit 1; }
+RUN command -v gcc >/dev/null 2>&1 || { echo "ERROR: gcc is not installed"; exit 1; }
+
+# Install Rust for Netavark compilation
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+# Install cross-compilation tools if needed
+RUN if [ "$TARGET_ARCH" = "arm64" ] && [ "$(uname -m)" = "x86_64" ]; then \
+        if [ "${OS_VERSION}" = "9" ] || [ "${OS_VERSION}" = "8" ]; then \
+            dnf install -y gcc-aarch64-linux-gnu; \
+        elif [ "${OS_VERSION}" = "7" ]; then \
+            yum install -y gcc-aarch64-linux-gnu || echo "Cross-compilation tools not available for RHEL 7"; \
+        fi; \
+    elif [ "$TARGET_ARCH" = "amd64" ] && [ "$(uname -m)" = "aarch64" ]; then \
+        if [ "${OS_VERSION}" = "9" ] || [ "${OS_VERSION}" = "8" ]; then \
+            dnf install -y gcc-x86_64-linux-gnu; \
+        elif [ "${OS_VERSION}" = "7" ]; then \
+            yum install -y gcc-x86_64-linux-gnu || echo "Cross-compilation tools not available for RHEL 7"; \
+        fi; \
+    fi
+
+WORKDIR /build
+
+# Build CRIU
+RUN mkdir -p criu && cd criu && \
+    if [ "$CRIU_VERSION" = "latest" ]; then \
+        CRIU_VERSION=$(curl -s https://api.github.com/repos/checkpoint-restore/criu/releases/latest | jq -r '.tag_name // empty' | head -1); \
+        if [ -z "$CRIU_VERSION" ] || [ "$CRIU_VERSION" = "null" ]; then \
+            CRIU_VERSION=$(curl -s https://api.github.com/repos/checkpoint-restore/criu/releases/latest | grep -o '"tag_name": "[^"]*' | cut -d'"' -f4); \
+        fi; \
+        if [ -z "$CRIU_VERSION" ] || [ "$CRIU_VERSION" = "null" ]; then \
+            echo "Warning: Could not fetch latest CRIU version, using v3.19 as fallback"; \
+            CRIU_VERSION="v3.19"; \
+        fi; \
+    fi && \
+    echo "Building CRIU version: $CRIU_VERSION" && \
+    git clone --depth 1 --branch "$CRIU_VERSION" https://github.com/checkpoint-restore/criu.git . && \
+    if [ "$TARGET_ARCH" = "arm64" ] && [ "$(uname -m)" = "x86_64" ]; then \
+        export CC=aarch64-linux-gnu-gcc && export ARCH=arm64; \
+    elif [ "$TARGET_ARCH" = "amd64" ] && [ "$(uname -m)" = "aarch64" ]; then \
+        export CC=x86_64-linux-gnu-gcc && export ARCH=x86_64; \
+    fi && \
+    # Use optimized make build with parallel jobs and minimal targets
+    make -j$(nproc) WERROR=0 V=1 criu && \
+    make install-criu PREFIX=/usr/local DESTDIR=
+
+# Build Netavark
+RUN mkdir -p netavark && cd netavark && \
+    if [ "$NETAVARK_VERSION" = "latest" ]; then \
+        NETAVARK_VERSION=$(curl -s https://api.github.com/repos/containers/netavark/releases/latest | jq -r '.tag_name // empty' | head -1); \
+        if [ -z "$NETAVARK_VERSION" ] || [ "$NETAVARK_VERSION" = "null" ]; then \
+            NETAVARK_VERSION=$(curl -s https://api.github.com/repos/containers/netavark/releases/latest | grep -o '"tag_name": "[^"]*' | cut -d'"' -f4); \
+        fi; \
+        if [ -z "$NETAVARK_VERSION" ] || [ "$NETAVARK_VERSION" = "null" ]; then \
+            echo "Warning: Could not fetch latest Netavark version, using v1.7.0 as fallback"; \
+            NETAVARK_VERSION="v1.7.0"; \
+        fi; \
+    fi && \
+    echo "Building Netavark version: $NETAVARK_VERSION" && \
+    git clone --depth 1 --branch "$NETAVARK_VERSION" https://github.com/containers/netavark.git . && \
+    # Optimize Rust compilation
+    echo '[profile.release]' > Cargo.toml.append && \
+    echo 'lto = true' >> Cargo.toml.append && \
+    echo 'codegen-units = 1' >> Cargo.toml.append && \
+    echo 'panic = "abort"' >> Cargo.toml.append && \
+    cat Cargo.toml.append >> Cargo.toml && \
+    # Set target for cross-compilation if needed
+    if [ "$TARGET_ARCH" = "arm64" ] && [ "$(uname -m)" = "x86_64" ]; then \
+        rustup target add aarch64-unknown-linux-gnu && \
+        export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc && \
+        cargo build --release --target aarch64-unknown-linux-gnu; \
+    elif [ "$TARGET_ARCH" = "amd64" ] && [ "$(uname -m)" = "aarch64" ]; then \
+        rustup target add x86_64-unknown-linux-gnu && \
+        export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=x86_64-linux-gnu-gcc && \
+        cargo build --release --target x86_64-unknown-linux-gnu; \
+    else \
+        cargo build --release; \
+    fi
+
+# Install missing dependencies that aren't available in UBI8
+RUN if [ "${OS_VERSION}" = "8" ]; then \
+        echo "Installing missing dependencies from source for RHEL 8..." && \
+        cd /tmp && \
+        # Install libnet from source (required for CRIU)
+        wget https://github.com/libnet/libnet/releases/download/v1.2/libnet-1.2.tar.gz && \
+        tar -xzf libnet-1.2.tar.gz && \
+        cd libnet-1.2 && \
+        ./configure --prefix=/usr/local && \
+        make && make install && \
+        cd /tmp && \
+        # Install libnl3 from source
+        wget https://github.com/thom311/libnl/releases/download/libnl3_8_0/libnl-3.8.0.tar.gz && \
+        tar -xzf libnl-3.8.0.tar.gz && \
+        cd libnl-3.8.0 && \
+        ./configure --prefix=/usr/local && \
+        make && make install && \
+        cd /tmp && \
+        # Create symlinks for pkg-config to find the libraries
+        echo "/usr/local/lib" > /etc/ld.so.conf.d/local.conf && \
+        ldconfig && \
+        rm -rf /tmp/libnet-* /tmp/libnl-*; \
+    fi
+
+# Copy dependencies to a known location for extraction
+RUN mkdir -p /build/deps && \
+    if [ -d /usr/lib64 ]; then \
+        cp -r /usr/lib64/* /build/deps/ 2>/dev/null || true; \
+    else \
+        cp -r /usr/lib/* /build/deps/ 2>/dev/null || true; \
+    fi
+
+# Copy final binaries to predictable locations
+RUN cp /usr/local/bin/criu /usr/local/bin/criu-final 2>/dev/null || true
+RUN find /build/netavark/target -name netavark -type f -executable -exec cp {} /usr/local/bin/netavark-final \; 2>/dev/null || true

@@ -1,0 +1,73 @@
+# DAKR Snapshot Tools Build Configuration
+
+# Default versions (can be overridden by environment variables or CI)
+DEFAULT_CRIU_VERSION=latest
+DEFAULT_NETAVARK_VERSION=latest
+
+# Supported platforms configuration
+[platforms]
+
+[platforms.ubuntu]
+versions = ["20.04", "22.04", "24.04"]
+architectures = ["amd64", "arm64"]
+base_image = "ubuntu"
+
+[platforms.centos]
+versions = ["7", "8"]
+architectures = ["amd64", "arm64"]
+base_image = "centos"
+
+[platforms.fedora]
+versions = ["38", "39", "40"]
+architectures = ["amd64", "arm64"]
+base_image = "fedora"
+
+[platforms.amazonlinux]
+versions = ["2", "2023"]
+architectures = ["amd64", "arm64"]
+base_image = "amazonlinux"
+
+[platforms.rockylinux]
+versions = ["8", "9"]
+architectures = ["amd64", "arm64"]
+base_image = "rockylinux"
+
+[platforms.debian]
+versions = ["11", "12"]
+architectures = ["amd64", "arm64"]
+base_image = "debian"
+
+[platforms.alpine]
+versions = ["3.18", "3.19"]
+architectures = ["amd64", "arm64"]
+base_image = "alpine"
+
+[platforms.rhel]
+versions = ["7", "8", "9"]
+architectures = ["amd64", "arm64"]
+base_image = "registry.access.redhat.com/ubi"
+
+# Build configuration
+[build]
+parallel_builds = true
+max_parallel_jobs = 4
+timeout_minutes = 60
+retry_attempts = 2
+
+# Output configuration
+[output]
+compression = "gzip"
+checksum_algorithm = "sha256"
+include_metadata = true
+include_dependencies = true
+
+# Repository URLs
+[repositories]
+criu = "https://github.com/checkpoint-restore/criu.git"
+netavark = "https://github.com/containers/netavark.git"
+
+# CI/CD specific settings
+[ci]
+artifact_retention_days = 30
+create_release_on_tag = true
+update_readme_on_release = true

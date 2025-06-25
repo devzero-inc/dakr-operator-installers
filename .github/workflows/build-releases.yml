@@ -1,0 +1,373 @@
+name: Build CRIU and Netavark Releases
+
+on:
+  push:
+    branches: [ garvit/criu-netavark-releases ]
+  workflow_dispatch:
+    inputs:
+      criu_version:
+        description: 'CRIU version to build (e.g., v3.19)'
+        required: false
+        default: 'latest'
+      netavark_version:
+        description: 'Netavark version to build (e.g., v1.7.0)'
+        required: false
+        default: 'latest'
+      create_release:
+        description: 'Create a new release'
+        required: false
+        default: 'false'
+        type: boolean
+
+env:
+  CRIU_VERSION: ${{ github.event.inputs.criu_version || 'latest' }}
+  NETAVARK_VERSION: ${{ github.event.inputs.netavark_version || 'latest' }}
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  determine-versions:
+    runs-on: ubuntu-latest
+    outputs:
+      criu_version: ${{ steps.versions.outputs.criu_version }}
+      netavark_version: ${{ steps.versions.outputs.netavark_version }}
+      release_tag: ${{ steps.versions.outputs.release_tag }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Determine versions
+        id: versions
+        run: |
+          # Determine CRIU version
+          if [ "${{ env.CRIU_VERSION }}" = "latest" ]; then
+            CRIU_VER=$(curl -s https://api.github.com/repos/checkpoint-restore/criu/releases/latest | jq -r .tag_name)
+          else
+            CRIU_VER="${{ env.CRIU_VERSION }}"
+          fi
+          
+          # Determine Netavark version
+          if [ "${{ env.NETAVARK_VERSION }}" = "latest" ]; then
+            NETAVARK_VER=$(curl -s https://api.github.com/repos/containers/netavark/releases/latest | jq -r .tag_name)
+          else
+            NETAVARK_VER="${{ env.NETAVARK_VERSION }}"
+          fi
+          
+          # Create release tag
+          RELEASE_TAG="criu-${CRIU_VER}-netavark-${NETAVARK_VER}-$(date +%Y%m%d)"
+          
+          echo "criu_version=${CRIU_VER}" >> $GITHUB_OUTPUT
+          echo "netavark_version=${NETAVARK_VER}" >> $GITHUB_OUTPUT
+          echo "release_tag=${RELEASE_TAG}" >> $GITHUB_OUTPUT
+          
+          echo "Building CRIU ${CRIU_VER} and Netavark ${NETAVARK_VER}"
+          echo "Release tag: ${RELEASE_TAG}"
+
+  build-matrix:
+    needs: determine-versions
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Ubuntu builds
+          - os: ubuntu
+            version: "20.04"
+            arch: amd64
+          - os: ubuntu
+            version: "20.04"
+            arch: arm64
+          - os: ubuntu
+            version: "22.04"
+            arch: amd64
+          - os: ubuntu
+            version: "22.04"
+            arch: arm64
+          - os: ubuntu
+            version: "24.04"
+            arch: amd64
+          - os: ubuntu
+            version: "24.04"
+            arch: arm64
+          
+          # CentOS/RHEL builds
+          - os: centos
+            version: "7"
+            arch: amd64
+          - os: centos
+            version: "7"
+            arch: arm64
+          - os: centos
+            version: "8"
+            arch: amd64
+          - os: centos
+            version: "8"
+            arch: arm64
+          
+          # Fedora builds
+          - os: fedora
+            version: "38"
+            arch: amd64
+          - os: fedora
+            version: "38"
+            arch: arm64
+          - os: fedora
+            version: "39"
+            arch: amd64
+          - os: fedora
+            version: "39"
+            arch: arm64
+          - os: fedora
+            version: "40"
+            arch: amd64
+          - os: fedora
+            version: "40"
+            arch: arm64
+          
+          # Amazon Linux builds
+          - os: amazonlinux
+            version: "2"
+            arch: amd64
+          - os: amazonlinux
+            version: "2"
+            arch: arm64
+          - os: amazonlinux
+            version: "2023"
+            arch: amd64
+          - os: amazonlinux
+            version: "2023"
+            arch: arm64
+          
+          # Rocky Linux builds
+          - os: rockylinux
+            version: "8"
+            arch: amd64
+          - os: rockylinux
+            version: "8"
+            arch: arm64
+          - os: rockylinux
+            version: "9"
+            arch: amd64
+          - os: rockylinux
+            version: "9"
+            arch: arm64
+          
+          # Debian builds
+          - os: debian
+            version: "11"
+            arch: amd64
+          - os: debian
+            version: "11"
+            arch: arm64
+          - os: debian
+            version: "12"
+            arch: amd64
+          - os: debian
+            version: "12"
+            arch: arm64
+          
+          # Alpine builds
+          - os: alpine
+            version: "3.18"
+            arch: amd64
+          - os: alpine
+            version: "3.18"
+            arch: arm64
+          - os: alpine
+            version: "3.19"
+            arch: amd64
+          - os: alpine
+            version: "3.19"
+            arch: arm64
+          
+          # RHEL builds
+          - os: rhel
+            version: "7"
+            arch: amd64
+          - os: rhel
+            version: "7"
+            arch: arm64
+          - os: rhel
+            version: "8"
+            arch: amd64
+          - os: rhel
+            version: "8"
+            arch: arm64
+          - os: rhel
+            version: "9"
+            arch: amd64
+          - os: rhel
+            version: "9"
+            arch: arm64
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build CRIU and Netavark
+        run: |
+          ./scripts/build.sh \
+            --os "${{ matrix.os }}" \
+            --version "${{ matrix.version }}" \
+            --arch "${{ matrix.arch }}" \
+            --criu-version "${{ needs.determine-versions.outputs.criu_version }}" \
+            --netavark-version "${{ needs.determine-versions.outputs.netavark_version }}"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: binaries-${{ matrix.os }}-${{ matrix.version }}-${{ matrix.arch }}
+          path: |
+            dist/
+          retention-days: 30
+
+  create-release:
+    needs: [determine-versions, build-matrix]
+    runs-on: ubuntu-latest
+    if: (github.event.inputs.create_release == 'true' || startsWith(github.ref, 'refs/tags/')) && always()
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+        continue-on-error: true
+
+      - name: Check for successful builds
+        id: check-builds
+        run: |
+          artifact_count=$(find artifacts/ -name "binaries-*" -type d | wc -l)
+          echo "Found $artifact_count successful builds"
+          echo "artifact_count=$artifact_count" >> $GITHUB_OUTPUT
+          
+          if [ "$artifact_count" -eq 0 ]; then
+            echo "ERROR: No successful builds found! Cannot create release."
+            exit 1
+          else
+            echo "SUCCESS: Found $artifact_count successful builds. Proceeding with release."
+          fi
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release-assets
+          successful_builds=0
+          failed_builds=0
+          
+          # Organize artifacts by OS/arch
+          for artifact_dir in artifacts/binaries-*; do
+            if [ -d "$artifact_dir" ]; then
+              artifact_name=$(basename "$artifact_dir")
+              # Extract OS, version, and arch from artifact name
+              os_version_arch=$(echo "$artifact_name" | sed 's/binaries-//')
+              
+              # Check if artifact contains binaries
+              if find "$artifact_dir" -name "criu" -o -name "netavark" | grep -q .; then
+                # Create archive for this OS/version/arch combination
+                cd "$artifact_dir"
+                tar -czf "../../release-assets/dakr-snapshot-tools-${os_version_arch}.tar.gz" *
+                cd ../..
+                successful_builds=$((successful_builds + 1))
+                echo "✓ Created archive for $os_version_arch"
+              else
+                failed_builds=$((failed_builds + 1))
+                echo "✗ No binaries found for $os_version_arch"
+              fi
+            fi
+          done
+          
+          echo "SUMMARY:"
+          echo "  Successful builds: $successful_builds"
+          echo "  Failed builds: $failed_builds"
+          
+          # Create checksums
+          cd release-assets
+          if ls *.tar.gz 1> /dev/null 2>&1; then
+            sha256sum *.tar.gz > checksums.txt
+            echo "Created checksums for $(ls *.tar.gz | wc -l) archives"
+          else
+            echo "No archives to create checksums for"
+            exit 1
+          fi
+          cd ..
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ needs.determine-versions.outputs.release_tag }}
+          name: "DAKR Snapshot Tools - ${{ needs.determine-versions.outputs.release_tag }}"
+          body: |
+            ## DAKR Snapshot Tools Release
+            
+            This release contains pre-built binaries of CRIU and Netavark for multiple Linux distributions and architectures.
+            
+            ### Versions
+            - **CRIU**: ${{ needs.determine-versions.outputs.criu_version }}
+            - **Netavark**: ${{ needs.determine-versions.outputs.netavark_version }}
+            
+            ### Build Status
+            Successfully built for ${{ steps.check-builds.outputs.artifact_count }} platform(s).
+            
+            **Note**: Some builds may have failed. Only successful builds are included in this release.
+            Check the [Actions tab](https://github.com/${{ github.repository }}/actions) for detailed build logs.
+            
+            ### Supported Platforms
+            Available binaries (check release assets for actual successful builds):
+            - Ubuntu 20.04, 22.04, 24.04 (amd64, arm64)
+            - CentOS 7, 8 (amd64, arm64)
+            - Fedora 38, 39, 40 (amd64, arm64)
+            - Amazon Linux 2, 2023 (amd64, arm64)
+            - Rocky Linux 8, 9 (amd64, arm64)
+            - Debian 11, 12 (amd64, arm64)
+            - Alpine 3.18, 3.19 (amd64, arm64)
+            - Red Hat Enterprise Linux 7, 8, 9 (amd64, arm64)
+            
+            ### Installation
+            1. Download the appropriate archive for your platform
+            2. Extract the binaries: `tar -xzf dakr-snapshot-tools-<platform>.tar.gz`
+            3. Place binaries in your PATH or use them directly
+            
+            ### Verification
+            Verify checksums using: `sha256sum -c checksums.txt`
+            
+            Built on: $(date -u)
+          files: |
+            release-assets/*
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  update-documentation:
+    needs: [determine-versions, create-release]
+    runs-on: ubuntu-latest
+    if: github.event.inputs.create_release == 'true' || startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update README with latest release info
+        run: |
+          # Update README.md to include latest release information
+          ./scripts/update-readme.sh "${{ needs.determine-versions.outputs.release_tag }}"
+
+      - name: Commit and push changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add README.md
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "docs: update README with release ${{ needs.determine-versions.outputs.release_tag }}"
+            git push
+          fi

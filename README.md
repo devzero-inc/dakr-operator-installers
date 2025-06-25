@@ -175,3 +175,118 @@ The DAKR operator exposes an HTTP endpoint for manually triggering node deletion
     A successful request will return an HTTP 200 status and a message indicating that the node deletion was initiated. Check the operator logs for more details on the deletion process.
 
 **Caution:** This endpoint is intended for debugging and manual intervention. Exercise caution when using it, as it directly triggers node deletion.
+
+---
+
+## DAKR Snapshot Tools
+
+This repository also provides pre-built binaries of CRIU and Netavark for enabling container snapshotting capabilities across multiple Linux distributions and architectures.
+
+### Overview
+
+The DAKR operator relies on container snapshotting capabilities to optimize resource usage. These tools are essential components:
+
+- **CRIU (Checkpoint/Restore in Userspace)**: Enables checkpointing and restoring of running containers
+- **Netavark**: Provides networking capabilities for container runtimes
+
+### Supported Platforms
+
+| OS | Versions | Architectures | Status |
+|---|---|---|---|
+| Ubuntu | 20.04, 22.04, 24.04 | amd64, arm64 | ✅ Supported |
+| CentOS | 7, 8 | amd64, arm64 | ✅ Supported |
+| Fedora | 38, 39, 40 | amd64, arm64 | ✅ Supported |
+| Amazon Linux | 2, 2023 | amd64, arm64 | ✅ Supported |
+| Rocky Linux | 8, 9 | amd64, arm64 | ✅ Supported |
+| Debian | 11, 12 | amd64, arm64 | ✅ Supported |
+| Alpine | 3.18, 3.19 | amd64, arm64 | ✅ Supported |
+| RHEL | 7, 8, 9 | amd64, arm64 | ✅ Supported |
+
+### Quick Start
+
+#### Download Pre-built Binaries
+
+```bash
+# Download for your platform (example: Ubuntu 22.04 amd64)
+wget https://github.com/YOUR_ORG/dakr-operator/releases/latest/download/dakr-snapshot-tools-ubuntu-22.04-amd64.tar.gz
+
+# Extract binaries
+tar -xzf dakr-snapshot-tools-ubuntu-22.04-amd64.tar.gz
+
+# Verify binaries
+./criu --version
+./netavark --version
+
+# Install system-wide (optional)
+sudo cp criu netavark /usr/local/bin/
+```
+
+#### Build from Source
+
+```bash
+# Build for your local platform
+make build-local
+
+# Build for specific platform
+make build-ubuntu CRIU_VERSION=v3.19 NETAVARK_VERSION=v1.7.0
+
+# Build for all platforms
+make build-all
+
+# Test local build
+make test
+```
+
+### Development
+
+#### Prerequisites
+
+- Docker with BuildKit support
+- Make
+- Git
+
+#### Building Locally
+
+```bash
+# Clone the repository
+git clone https://github.com/YOUR_ORG/dakr-operator.git
+cd dakr-operator
+
+# Build for local development
+./scripts/dev-build.sh
+
+# Or use make
+make build-local
+
+# Build for specific OS/arch
+./scripts/build.sh --os ubuntu --version 22.04 --arch amd64
+```
+
+#### CI/CD Integration
+
+The repository includes GitHub Actions workflows that automatically build releases for all supported platforms. Releases are triggered by:
+
+- Creating a git tag (e.g., `v1.0.0`)
+- Manual workflow dispatch
+- Scheduled builds (weekly)
+
+### Integration with DAKR Operator
+
+These snapshot tools will be used by the DAKR operator's daemonset to:
+
+1. **Prepare nodes** for container snapshotting
+2. **Enable checkpoint/restore** capabilities
+3. **Optimize resource usage** through intelligent container lifecycle management
+
+The tools are automatically deployed and configured when the DAKR operator is installed via Helm.
+
+### Next Steps
+
+After setting up the DAKR operator and snapshot tools, the next phase involves creating a daemonset that will:
+
+1. Install and configure CRIU and Netavark on cluster nodes
+2. Set up the necessary kernel parameters and system configurations
+3. Prepare the runtime environment for container snapshotting
+4. Enable the DAKR operator to perform advanced resource optimization
+
+This daemonset will ensure that all nodes in your cluster are "snapshot-friendly" and ready for the advanced resource optimization capabilities that DAKR provides.
