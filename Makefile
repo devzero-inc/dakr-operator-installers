@@ -30,8 +30,8 @@ help:
 	@echo ""
 	@echo "Examples:"
 	@echo "  make build-local"
-	@echo "  make build-ubuntu CRIU_VERSION=v3.19"
-	@echo "  make build-all CRIU_VERSION=v3.19 NETAVARK_VERSION=v1.7.0"
+	@echo "  make build-ubuntu CRIU_VERSION=v4.1"
+	@echo "  make build-all CRIU_VERSION=v4.1 NETAVARK_VERSION=v1.15.2"
 
 # Variables
 CRIU_VERSION ?= latest

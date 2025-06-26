@@ -32,7 +32,7 @@ OPTIONS:
 EXAMPLES:
     $0 --os ubuntu --version 22.04 --arch amd64
     $0 --os alpine --version 3.19 --arch arm64 --cross-build
-    $0 --os ubuntu --version 20.04 --arch amd64 --criu-version v3.19
+    $0 --os ubuntu --version 20.04 --arch amd64 --criu-version v4.1
 
 NOTE:
     Cross-platform builds (--cross-build) require Docker buildx and QEMU emulation.

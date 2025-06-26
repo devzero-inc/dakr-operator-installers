@@ -230,7 +230,7 @@ sudo cp criu netavark /usr/local/bin/
 make build-local
 
 # Build for specific platform
-make build-ubuntu CRIU_VERSION=v3.19 NETAVARK_VERSION=v1.7.0
+make build-ubuntu CRIU_VERSION=v4.1 NETAVARK_VERSION=v1.15.2
 
 # Build for all platforms
 make build-all

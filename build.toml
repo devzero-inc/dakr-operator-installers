@@ -2,12 +2,11 @@
 
 # Static versions for consistent, predictable builds
 # These should be updated manually when we want to upgrade
-DEFAULT_CRIU_VERSION=v3.19
-DEFAULT_NETAVARK_VERSION=v1.7.0
+DEFAULT_CRIU_VERSION=v4.1
+DEFAULT_NETAVARK_VERSION=v1.15.2
 
 # Release configuration
 RELEASE_TAG_FORMAT=${DEFAULT_CRIU_VERSION}-${DEFAULT_NETAVARK_VERSION}
-DEFAULT_NETAVARK_VERSION=v1.7.0
 
 # Supported OS and architectures
 SUPPORTED_OS=["ubuntu", "debian", "centos", "rockylinux", "amazonlinux", "alpine"]

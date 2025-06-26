@@ -35,7 +35,7 @@ spec:
             fieldRef:
               fieldPath: spec.nodeName
         - name: CRIU_VERSION
-          value: "v3.19"
+          value: "v4.1"
         - name: NETAVARK_VERSION
           value: "v1.15.2"
         - name: DAKR_RELEASE_URL
@@ -236,7 +236,7 @@ spec:
               return 0
             fi
             
-            echo "Finding latest DAKR release..."
+            echo "Finding latest criu + netavark release..."
             
             local latest_tag=""
             local api_response=""

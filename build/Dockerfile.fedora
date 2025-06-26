@@ -55,8 +55,8 @@ RUN mkdir -p criu && cd criu && \
             CRIU_VERSION=$(curl -s https://api.github.com/repos/checkpoint-restore/criu/releases/latest | grep -o '"tag_name": "[^"]*' | cut -d'"' -f4); \
         fi; \
         if [ -z "$CRIU_VERSION" ] || [ "$CRIU_VERSION" = "null" ]; then \
-            echo "Warning: Could not fetch latest CRIU version, using v3.19 as fallback"; \
-            CRIU_VERSION="v3.19"; \
+            echo "Warning: Could not fetch latest CRIU version, using v4.1 as fallback"; \
+            CRIU_VERSION="v4.1"; \
         fi; \
     fi && \
     echo "Building CRIU version: $CRIU_VERSION" && \
@@ -78,8 +78,8 @@ RUN mkdir -p netavark && cd netavark && \
             NETAVARK_VERSION=$(curl -s https://api.github.com/repos/containers/netavark/releases/latest | grep -o '"tag_name": "[^"]*' | cut -d'"' -f4); \
         fi; \
         if [ -z "$NETAVARK_VERSION" ] || [ "$NETAVARK_VERSION" = "null" ]; then \
-            echo "Warning: Could not fetch latest Netavark version, using v1.7.0 as fallback"; \
-            NETAVARK_VERSION="v1.7.0"; \
+            echo "Warning: Could not fetch latest Netavark version, using v1.15.2 as fallback"; \
+            NETAVARK_VERSION="v1.15.2"; \
         fi; \
     fi && \
     echo "Building Netavark version: $NETAVARK_VERSION" && \
