@@ -1,0 +1,389 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: dakr-snapshot-setup
+  namespace: kube-system
+  labels:
+    app: dakr-snapshot-setup
+    component: snapshot-tools
+spec:
+  selector:
+    matchLabels:
+      app: dakr-snapshot-setup
+  template:
+    metadata:
+      labels:
+        app: dakr-snapshot-setup
+    spec:
+      hostNetwork: true
+      hostPID: true
+      serviceAccountName: dakr-snapshot-setup
+      tolerations:
+      - operator: Exists
+        effect: NoSchedule
+      - operator: Exists
+        effect: NoExecute
+      containers:
+      - name: snapshot-setup
+        image: alpine:3.18
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          privileged: true
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: CRIU_VERSION
+          value: "v3.19"
+        - name: NETAVARK_VERSION
+          value: "v1.15.2"
+        - name: DAKR_RELEASE_URL
+          value: "https://github.com/devzero-inc/dakr-operator/releases/download"
+        - name: DAKR_RELEASE_TAG
+          value: "criu-v3.19-netavark-v1.15.2-20250625"
+        - name: GITHUB_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: github-token
+              key: token
+        volumeMounts:
+        - name: host-bin
+          mountPath: /host/usr/local/bin
+        - name: host-lib
+          mountPath: /host/usr/local/lib
+        - name: host-etc
+          mountPath: /host/etc
+          readOnly: true
+        - name: host-proc
+          mountPath: /host/proc
+          readOnly: true
+        - name: host-sys
+          mountPath: /host/sys
+          readOnly: true
+        - name: host-dev
+          mountPath: /host/dev
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          
+          echo "Starting DAKR snapshot tools setup..."
+          
+          # Install required packages
+          apk add --no-cache curl jq file
+          
+          # Detect OS and architecture
+          detect_os_arch() {
+            # Get architecture
+            ARCH=$(uname -m)
+            case $ARCH in
+              x86_64) ARCH="amd64" ;;
+              aarch64) ARCH="arm64" ;;
+              *) echo "Unsupported architecture: $ARCH"; exit 1 ;;
+            esac
+            
+            # Detect OS from host
+            echo "Checking for OS release files..."
+            echo "Contents of /host/etc:"
+            ls -la /host/etc/ | head -10
+            
+            if [ -f /host/etc/os-release ]; then
+              echo "Found /host/etc/os-release:"
+              cat /host/etc/os-release
+              . /host/etc/os-release
+              case $ID in
+                ubuntu) OS="ubuntu" ;;
+                debian) OS="debian" ;;
+                centos) OS="centos" ;;
+                rhel) OS="centos" ;;  # Use centos binaries for RHEL
+                fedora) OS="fedora" ;;
+                rocky) OS="rockylinux" ;;
+                almalinux) OS="centos" ;;  # Use centos binaries for AlmaLinux
+                amzn) OS="amazonlinux" ;;
+                alpine) OS="alpine" ;;
+                *) echo "Unsupported OS: $ID"; exit 1 ;;
+              esac
+              VERSION_ID_MAJOR=$(echo $VERSION_ID | cut -d. -f1)
+              
+              # Handle version-specific OS names
+              case $OS in
+                amazonlinux)
+                  if [ "$VERSION_ID_MAJOR" = "2" ]; then
+                    OS_VERSION="amazonlinux-2"
+                  else
+                    OS_VERSION="amazonlinux-2023"
+                  fi
+                  ;;
+                ubuntu)
+                  OS_VERSION="ubuntu-${VERSION_ID}"
+                  ;;
+                *)
+                  OS_VERSION="$OS"
+                  ;;
+              esac
+            else
+              echo "No /host/etc/os-release found, trying fallback methods..."
+              
+              # Try other common release files
+              if [ -f /host/etc/lsb-release ]; then
+                echo "Found /host/etc/lsb-release:"
+                cat /host/etc/lsb-release
+                . /host/etc/lsb-release
+                case $DISTRIB_ID in
+                  Ubuntu) OS="ubuntu"; OS_VERSION="ubuntu-${DISTRIB_RELEASE}" ;;
+                  *) echo "Unsupported distribution: $DISTRIB_ID"; exit 1 ;;
+                esac
+              elif [ -f /host/etc/redhat-release ]; then
+                echo "Found /host/etc/redhat-release:"
+                cat /host/etc/redhat-release
+                OS="centos"
+                OS_VERSION="centos"
+              else
+                # Final fallback - assume Ubuntu (common in minikube)
+                echo "Warning: Could not detect OS, assuming Ubuntu 22.04"
+                OS="ubuntu"
+                OS_VERSION="ubuntu-22.04"
+              fi
+            fi
+            
+            echo "Detected OS: $OS_VERSION, Architecture: $ARCH"
+          }
+          
+          # Download and install binaries
+          install_binaries() {
+            local release_tag="${DAKR_RELEASE_TAG}"
+            local binary_name="dakr-snapshot-tools-${OS_VERSION}-${ARCH}.tar.gz"
+            local download_url="${DAKR_RELEASE_URL}/${release_tag}/${binary_name}"
+            
+            echo "Downloading binaries from: $download_url"
+            echo "GitHub token present: $([ -n "$GITHUB_TOKEN" ] && echo 'Yes' || echo 'No')"
+            
+            # Create temporary directory
+            TEMP_DIR=$(mktemp -d)
+            cd $TEMP_DIR
+            
+            # Download and extract
+            if [ -n "$GITHUB_TOKEN" ]; then
+              echo "Using GitHub token for authentication..."
+              if curl -v -L -f -H "Authorization: token $GITHUB_TOKEN" -o "$binary_name" "$download_url" --connect-timeout 30 --max-time 300; then
+                download_success=true
+              else
+                echo "Download failed with GitHub token. HTTP response:"
+                curl -I -H "Authorization: token $GITHUB_TOKEN" "$download_url" || true
+                download_success=false
+              fi
+            else
+              echo "No GitHub token provided, attempting public access..."
+              if curl -v -L -f -o "$binary_name" "$download_url" --connect-timeout 30 --max-time 300; then
+                download_success=true
+              else
+                echo "Download failed for public access. HTTP response:"
+                curl -I "$download_url" || true
+                download_success=false
+              fi
+            fi
+            
+            if [ "$download_success" = "true" ]; then
+              echo "Successfully downloaded $binary_name"
+              
+              # Debug: Check archive contents before extraction
+              echo "Archive contents:"
+              tar -tzf "$binary_name" | head -20
+              
+              tar -xzf "$binary_name"
+              
+              # Debug: Check what was extracted
+              echo "Extracted files:"
+              ls -la
+              
+              # The archive contains a subdirectory, so we need to enter it
+              if [ -d "ubuntu-22.04-amd64" ]; then
+                echo "Entering ubuntu-22.04-amd64 directory..."
+                cd ubuntu-22.04-amd64
+                echo "Contents:"
+                ls -la
+              elif [ -d "${OS_VERSION}-${ARCH}" ]; then
+                echo "Entering ${OS_VERSION}-${ARCH} directory..."
+                cd "${OS_VERSION}-${ARCH}"
+                echo "Contents:"
+                ls -la
+              else
+                echo "Looking for any subdirectory..."
+                subdir=$(ls -d */ 2>/dev/null | head -1)
+                if [ -n "$subdir" ]; then
+                  echo "Entering directory: $subdir"
+                  cd "$subdir"
+                  echo "Contents:"
+                  ls -la
+                fi
+              fi
+              
+              # Install CRIU
+              if [ -f criu ]; then
+                echo "Installing CRIU..."
+                cp criu /host/usr/local/bin/criu
+                chmod +x /host/usr/local/bin/criu
+                echo "CRIU installed successfully"
+              else
+                echo "Warning: CRIU binary not found in archive"
+              fi
+              
+              # Install Netavark
+              if [ -f netavark ]; then
+                echo "Installing Netavark..."
+                cp netavark /host/usr/local/bin/netavark
+                chmod +x /host/usr/local/bin/netavark
+                echo "Netavark installed successfully"
+              else
+                echo "Warning: Netavark binary not found in archive"
+              fi
+              
+              # Install any dependency libraries
+              if [ -d deps ]; then
+                echo "Installing dependency libraries..."
+                cp -r deps/* /host/usr/local/lib/ 2>/dev/null || true
+              fi
+              
+            else
+              echo "Failed to download binaries for ${OS_VERSION}-${ARCH}"
+              echo "Tried URL: $download_url"
+              exit 1
+            fi
+            
+            # Cleanup
+            cd /
+            rm -rf $TEMP_DIR
+          }
+          
+          # Verify installation
+          verify_installation() {
+            echo "Verifying installation..."
+            
+            # Check CRIU
+            if chroot /host /usr/local/bin/criu --version > /dev/null 2>&1; then
+              CRIU_VER=$(chroot /host /usr/local/bin/criu --version 2>/dev/null | head -1)
+              echo "✅ CRIU installed: $CRIU_VER"
+            else
+              echo "❌ CRIU verification failed"
+              return 1
+            fi
+            
+            # Check Netavark
+            if chroot /host /usr/local/bin/netavark --version > /dev/null 2>&1; then
+              NETAVARK_VER=$(chroot /host /usr/local/bin/netavark --version 2>/dev/null | head -1)
+              echo "✅ Netavark installed: $NETAVARK_VER"
+            else
+              echo "❌ Netavark verification failed"
+              return 1
+            fi
+            
+            echo "All tools installed and verified successfully!"
+          }
+          
+          # Setup kernel parameters for CRIU
+          setup_kernel_params() {
+            echo "Setting up kernel parameters for CRIU..."
+            
+            # Enable checkpoint/restore in seccomp (if available)
+            if [ -f /host/proc/sys/kernel/seccomp/actions_avail ]; then
+              if grep -q "allow" /host/proc/sys/kernel/seccomp/actions_avail; then
+                echo "Seccomp actions already configured"
+              fi
+            fi
+            
+            # Check for required kernel features
+            echo "Checking kernel features..."
+            if [ -f /host/proc/config.gz ]; then
+              if zcat /host/proc/config.gz | grep -q "CONFIG_CHECKPOINT_RESTORE=y"; then
+                echo "✅ Checkpoint/Restore support enabled"
+              else
+                echo "⚠️  Checkpoint/Restore support not explicitly enabled"
+              fi
+            else
+              echo "ℹ️  Cannot check kernel config (/proc/config.gz not available)"
+            fi
+            
+            # Check cgroups v2
+            if [ -f /host/sys/fs/cgroup/cgroup.controllers ]; then
+              echo "✅ cgroups v2 detected"
+            else
+              echo "ℹ️  cgroups v1 detected"
+            fi
+          }
+          
+          # Main execution
+          main() {
+            detect_os_arch
+            install_binaries
+            verify_installation
+            setup_kernel_params
+            
+            echo "DAKR snapshot tools setup completed successfully on node: $NODE_NAME"
+            echo "Node is now ready for container checkpointing and restoration"
+            
+            # Keep container running to maintain the daemonset
+            echo "Setup complete. Monitoring for changes..."
+            while true; do
+              sleep 3600
+            done
+          }
+          
+          main
+      volumes:
+      - name: host-bin
+        hostPath:
+          path: /usr/local/bin
+          type: DirectoryOrCreate
+      - name: host-lib
+        hostPath:
+          path: /usr/local/lib
+          type: DirectoryOrCreate
+      - name: host-etc
+        hostPath:
+          path: /etc
+          type: Directory
+      - name: host-proc
+        hostPath:
+          path: /proc
+          type: Directory
+      - name: host-sys
+        hostPath:
+          path: /sys
+          type: Directory
+      - name: host-dev
+        hostPath:
+          path: /dev
+          type: Directory
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dakr-snapshot-setup
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: dakr-snapshot-setup
+rules:
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["get", "list"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: dakr-snapshot-setup
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: dakr-snapshot-setup
+subjects:
+- kind: ServiceAccount
+  name: dakr-snapshot-setup
+  namespace: kube-system

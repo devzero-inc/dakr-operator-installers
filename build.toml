@@ -1,8 +1,17 @@
 # DAKR Snapshot Tools Build Configuration
 
-# Default versions (can be overridden by environment variables or CI)
-DEFAULT_CRIU_VERSION=latest
-DEFAULT_NETAVARK_VERSION=latest
+# Static versions for consistent, predictable builds
+# These should be updated manually when we want to upgrade
+DEFAULT_CRIU_VERSION=v3.19
+DEFAULT_NETAVARK_VERSION=v1.7.0
+
+# Release configuration
+RELEASE_TAG_FORMAT=${DEFAULT_CRIU_VERSION}-${DEFAULT_NETAVARK_VERSION}
+DEFAULT_NETAVARK_VERSION=v1.7.0
+
+# Supported OS and architectures
+SUPPORTED_OS=["ubuntu", "debian", "centos", "rockylinux", "amazonlinux", "alpine"]
+SUPPORTED_ARCH=["amd64", "arm64"]
 
 # Supported platforms configuration
 [platforms]

@@ -64,14 +64,15 @@ RUN if [ "${OS_VERSION}" = "2023" ]; then \
             python3-protobuf \
             asciidoc \
             xmlto \
-            ca-certificates && \
+            ca-certificates \
+            autoconf \
+            automake \
+            libtool \
+            unzip && \
         yum clean all && \
-        echo "Installing protobuf-c for AL2..." && \
-        yum install -y protobuf-c-devel protobuf-c-compiler || \
-        echo "Warning: Could not install protobuf-c-devel, continuing without it" && \
-        echo "Installing newer protobuf for proto3 support..." && \
-        yum install -y autoconf automake libtool unzip && \
+        echo "Installing modern protobuf with proper development files..." && \
         cd /tmp && \
+        # Install protobuf with all necessary files
         curl -LO https://github.com/protocolbuffers/protobuf/releases/download/v21.12/protobuf-all-21.12.tar.gz && \
         tar -xzf protobuf-all-21.12.tar.gz && \
         cd protobuf-21.12 && \
@@ -80,12 +81,28 @@ RUN if [ "${OS_VERSION}" = "2023" ]; then \
         make install && \
         echo "/usr/local/lib" > /etc/ld.so.conf.d/protobuf.conf && \
         ldconfig && \
-        # Copy proto files to expected location for CRIU
+        # Ensure proto files are in the right location
         mkdir -p /usr/local/include/google/protobuf && \
-        cp -r src/google/protobuf/*.proto /usr/local/include/google/protobuf/ 2>/dev/null || true && \
+        cp -r src/google/protobuf/*.proto /usr/local/include/google/protobuf/ && \
+        # Also copy to standard system location
+        mkdir -p /usr/include/google/protobuf && \
+        cp -r src/google/protobuf/*.proto /usr/include/google/protobuf/ && \
         cd /tmp && \
-        rm -rf protobuf-21.12 protobuf-all-21.12.tar.gz && \
-        /usr/local/bin/protoc --version; \
+        # Now install protobuf-c which depends on protobuf
+        curl -LO https://github.com/protobuf-c/protobuf-c/releases/download/v1.4.1/protobuf-c-1.4.1.tar.gz && \
+        tar -xzf protobuf-c-1.4.1.tar.gz && \
+        cd protobuf-c-1.4.1 && \
+        PKG_CONFIG_PATH=/usr/local/lib/pkgconfig ./configure --prefix=/usr/local && \
+        make -j$(nproc) && \
+        make install && \
+        ldconfig && \
+        cd /tmp && \
+        rm -rf protobuf-21.12 protobuf-all-21.12.tar.gz protobuf-c-1.4.1 protobuf-c-1.4.1.tar.gz && \
+        # Verify installations
+        /usr/local/bin/protoc --version && \
+        /usr/local/bin/protoc-c --version && \
+        ls -la /usr/local/include/google/protobuf/ && \
+        ls -la /usr/include/google/protobuf/; \
     else \
         echo "Unsupported Amazon Linux version: ${OS_VERSION}" && \
         exit 1; \
@@ -122,20 +139,12 @@ RUN command -v protoc && protoc --version && echo "protoc verification successfu
 
 # Verify protoc-c installation for AL2
 RUN if [ "${OS_VERSION}" = "2" ]; then \
-        if ! command -v protoc-c >/dev/null 2>&1; then \
-            echo "protoc-c not found, building from source..." && \
-            cd /tmp && \
-            curl -LO https://github.com/protobuf-c/protobuf-c/releases/download/v1.4.1/protobuf-c-1.4.1.tar.gz && \
-            tar -xzf protobuf-c-1.4.1.tar.gz && \
-            cd protobuf-c-1.4.1 && \
-            ./configure --prefix=/usr/local && \
-            make -j$(nproc) && \
-            make install && \
-            cd /tmp && \
-            rm -rf protobuf-c-1.4.1 protobuf-c-1.4.1.tar.gz && \
-            ldconfig; \
-        fi && \
-        command -v protoc-c && protoc-c --version && echo "protoc-c verification successful"; \
+        echo "Verifying protobuf installation..." && \
+        command -v protoc && protoc --version && \
+        command -v protoc-c && protoc-c --version && \
+        echo "Checking for descriptor.proto..." && \
+        find /usr -name "descriptor.proto" 2>/dev/null | head -5 && \
+        echo "protobuf verification successful"; \
     fi
 
 WORKDIR /build
@@ -153,30 +162,19 @@ RUN mkdir -p criu && cd criu && \
         fi; \
     fi && \
     echo "Building CRIU version: $CRIU_VERSION" && \
+    echo "OS_VERSION is: ${OS_VERSION}" && \
     git clone --depth 1 --branch "$CRIU_VERSION" https://github.com/checkpoint-restore/criu.git . && \
-    # For Amazon Linux 2, we need to fix protobuf includes
-    if [ "${OS_VERSION}" = "2" ]; then \
-        echo "Creating protobuf directory structure for AL2..." && \
+    # Check for descriptor.proto and create symlink if needed
+    echo "Checking for descriptor.proto..." && \
+    find /usr -name "descriptor.proto" 2>/dev/null | head -5 && \
+    DESCRIPTOR_PATH=$(find /usr -name "descriptor.proto" 2>/dev/null | head -1) && \
+    if [ -n "$DESCRIPTOR_PATH" ]; then \
+        echo "Found descriptor.proto at: $DESCRIPTOR_PATH" && \
         mkdir -p images/google/protobuf && \
-        # Create a basic descriptor.proto file with essential protobuf definitions
-        echo 'syntax = "proto2";' > images/google/protobuf/descriptor.proto && \
-        echo '' >> images/google/protobuf/descriptor.proto && \
-        echo 'package google.protobuf;' >> images/google/protobuf/descriptor.proto && \
-        echo '' >> images/google/protobuf/descriptor.proto && \
-        echo 'message FileDescriptorSet {' >> images/google/protobuf/descriptor.proto && \
-        echo '  repeated FileDescriptorProto file = 1;' >> images/google/protobuf/descriptor.proto && \
-        echo '}' >> images/google/protobuf/descriptor.proto && \
-        echo '' >> images/google/protobuf/descriptor.proto && \
-        echo 'message FileDescriptorProto {' >> images/google/protobuf/descriptor.proto && \
-        echo '  optional string name = 1;' >> images/google/protobuf/descriptor.proto && \
-        echo '  optional string package = 2;' >> images/google/protobuf/descriptor.proto && \
-        echo '}' >> images/google/protobuf/descriptor.proto && \
-        echo "Created minimal descriptor.proto for AL2"; \
-    fi && \
-    if [ "$TARGET_ARCH" = "arm64" ] && [ "$(uname -m)" = "x86_64" ]; then \
-        export CC=aarch64-linux-gnu-gcc && export ARCH=arm64; \
-    elif [ "$TARGET_ARCH" = "amd64" ] && [ "$(uname -m)" = "aarch64" ]; then \
-        export CC=x86_64-linux-gnu-gcc && export ARCH=x86_64; \
+        ln -sf "$DESCRIPTOR_PATH" images/google/protobuf/descriptor.proto && \
+        echo "Created symlink to system descriptor.proto"; \
+    else \
+        echo "No descriptor.proto found - this might cause build issues"; \
     fi && \
     # Use optimized make build with parallel jobs and minimal targets
     make -j$(nproc) WERROR=0 V=1 criu && \
