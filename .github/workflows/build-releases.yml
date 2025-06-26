@@ -8,7 +8,7 @@ on:
       criu_version:
         description: 'CRIU version to build (e.g., v4.1)'
         required: false
-        default: 'v4.1'
+        default: 'v3.19'
       netavark_version:
         description: 'Netavark version to build (e.g., v1.15.2)'
         required: false
@@ -20,7 +20,7 @@ on:
         type: boolean
 
 env:
-  CRIU_VERSION: ${{ github.event.inputs.criu_version || 'v4.1' }}
+  CRIU_VERSION: ${{ github.event.inputs.criu_version || 'v3.19' }}
   NETAVARK_VERSION: ${{ github.event.inputs.netavark_version || 'v1.15.2' }}
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
