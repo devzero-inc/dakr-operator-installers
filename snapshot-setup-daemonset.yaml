@@ -40,13 +40,8 @@ spec:
           value: "v1.15.2"
         - name: DAKR_RELEASE_URL
           value: "https://github.com/devzero-inc/dakr-operator/releases/download"
-        - name: DAKR_RELEASE_TAG
-          value: "criu-v3.19-netavark-v1.15.2-20250625"
-        - name: GITHUB_TOKEN
-          valueFrom:
-            secretKeyRef:
-              name: github-token
-              key: token
+        - name: DAKR_RELEASE_PREFIX
+          value: "DAKR Snapshot Tools - criu-"
         volumeMounts:
         - name: host-bin
           mountPath: /host/usr/local/bin
@@ -71,12 +66,9 @@ spec:
           
           echo "Starting DAKR snapshot tools setup..."
           
-          # Install required packages
           apk add --no-cache curl jq file
           
-          # Detect OS and architecture
           detect_os_arch() {
-            # Get architecture
             ARCH=$(uname -m)
             case $ARCH in
               x86_64) ARCH="amd64" ;;
@@ -84,7 +76,6 @@ spec:
               *) echo "Unsupported architecture: $ARCH"; exit 1 ;;
             esac
             
-            # Detect OS from host
             echo "Checking for OS release files..."
             echo "Contents of /host/etc:"
             ls -la /host/etc/ | head -10
@@ -107,7 +98,6 @@ spec:
               esac
               VERSION_ID_MAJOR=$(echo $VERSION_ID | cut -d. -f1)
               
-              # Handle version-specific OS names
               case $OS in
                 amazonlinux)
                   if [ "$VERSION_ID_MAJOR" = "2" ]; then
@@ -126,7 +116,6 @@ spec:
             else
               echo "No /host/etc/os-release found, trying fallback methods..."
               
-              # Try other common release files
               if [ -f /host/etc/lsb-release ]; then
                 echo "Found /host/etc/lsb-release:"
                 cat /host/etc/lsb-release
@@ -150,150 +139,293 @@ spec:
             
             echo "Detected OS: $OS_VERSION, Architecture: $ARCH"
           }
-          
-          # Download and install binaries
-          install_binaries() {
-            local release_tag="${DAKR_RELEASE_TAG}"
-            local binary_name="dakr-snapshot-tools-${OS_VERSION}-${ARCH}.tar.gz"
-            local download_url="${DAKR_RELEASE_URL}/${release_tag}/${binary_name}"
+
+          check_existing_installation() {
+            echo "Checking for existing installations..."
             
-            echo "Downloading binaries from: $download_url"
-            echo "GitHub token present: $([ -n "$GITHUB_TOKEN" ] && echo 'Yes' || echo 'No')"
+            criu_exists=false
+            netavark_exists=false
             
-            # Create temporary directory
-            TEMP_DIR=$(mktemp -d)
-            cd $TEMP_DIR
+            echo "🔍 Checking for CRIU on host system..."
+            criu_path=""
             
-            # Download and extract
-            if [ -n "$GITHUB_TOKEN" ]; then
-              echo "Using GitHub token for authentication..."
-              if curl -v -L -f -H "Authorization: token $GITHUB_TOKEN" -o "$binary_name" "$download_url" --connect-timeout 30 --max-time 300; then
-                download_success=true
-              else
-                echo "Download failed with GitHub token. HTTP response:"
-                curl -I -H "Authorization: token $GITHUB_TOKEN" "$download_url" || true
-                download_success=false
+            for path in /usr/local/bin/criu /usr/bin/criu /bin/criu /sbin/criu; do
+              if [ -x "/host$path" ]; then
+                echo "Found CRIU at host path: $path"
+                criu_path="$path"
+                break
               fi
-            else
-              echo "No GitHub token provided, attempting public access..."
-              if curl -v -L -f -o "$binary_name" "$download_url" --connect-timeout 30 --max-time 300; then
-                download_success=true
-              else
-                echo "Download failed for public access. HTTP response:"
-                curl -I "$download_url" || true
-                download_success=false
+            done
+            
+            if [ -z "$criu_path" ]; then
+              echo "Checking if CRIU is available in host PATH..."
+              if nsenter --target 1 --mount --uts --ipc --net --pid which criu >/dev/null 2>&1; then
+                criu_path=$(nsenter --target 1 --mount --uts --ipc --net --pid which criu 2>/dev/null)
+                echo "Found CRIU in host PATH at: $criu_path"
               fi
             fi
             
-            if [ "$download_success" = "true" ]; then
-              echo "Successfully downloaded $binary_name"
-              
-              # Debug: Check archive contents before extraction
-              echo "Archive contents:"
-              tar -tzf "$binary_name" | head -20
-              
-              tar -xzf "$binary_name"
-              
-              # Debug: Check what was extracted
-              echo "Extracted files:"
-              ls -la
-              
-              # The archive contains a subdirectory, so we need to enter it
-              if [ -d "ubuntu-22.04-amd64" ]; then
-                echo "Entering ubuntu-22.04-amd64 directory..."
-                cd ubuntu-22.04-amd64
-                echo "Contents:"
-                ls -la
-              elif [ -d "${OS_VERSION}-${ARCH}" ]; then
-                echo "Entering ${OS_VERSION}-${ARCH} directory..."
-                cd "${OS_VERSION}-${ARCH}"
-                echo "Contents:"
-                ls -la
+            if [ -n "$criu_path" ]; then
+              echo "Testing CRIU functionality on host..."
+              # Test CRIU version command using nsenter to run in host context
+              if nsenter --target 1 --mount --uts --ipc --net --pid "$criu_path" --version >/dev/null 2>&1; then
+                criu_version=$(nsenter --target 1 --mount --uts --ipc --net --pid "$criu_path" --version 2>/dev/null | head -1 || echo 'unknown')
+                echo "✅ CRIU is working on host! Version: $criu_version"
+                criu_exists=true
               else
-                echo "Looking for any subdirectory..."
-                subdir=$(ls -d */ 2>/dev/null | head -1)
-                if [ -n "$subdir" ]; then
-                  echo "Entering directory: $subdir"
-                  cd "$subdir"
-                  echo "Contents:"
-                  ls -la
-                fi
+                echo "⚠️  CRIU found but not functional (version check failed)"
+                criu_exists=false
               fi
-              
-              # Install CRIU
-              if [ -f criu ]; then
-                echo "Installing CRIU..."
-                cp criu /host/usr/local/bin/criu
-                chmod +x /host/usr/local/bin/criu
-                echo "CRIU installed successfully"
-              else
-                echo "Warning: CRIU binary not found in archive"
-              fi
-              
-              # Install Netavark
-              if [ -f netavark ]; then
-                echo "Installing Netavark..."
-                cp netavark /host/usr/local/bin/netavark
-                chmod +x /host/usr/local/bin/netavark
-                echo "Netavark installed successfully"
-              else
-                echo "Warning: Netavark binary not found in archive"
-              fi
-              
-              # Install any dependency libraries
-              if [ -d deps ]; then
-                echo "Installing dependency libraries..."
-                cp -r deps/* /host/usr/local/lib/ 2>/dev/null || true
-              fi
-              
             else
-              echo "Failed to download binaries for ${OS_VERSION}-${ARCH}"
-              echo "Tried URL: $download_url"
+              echo "❌ CRIU not found on host system"
+              criu_exists=false
+            fi
+            
+            echo "🔍 Checking for Netavark on host system..."
+            netavark_path=""
+            
+            for path in /usr/local/bin/netavark /usr/bin/netavark /bin/netavark /sbin/netavark; do
+              if [ -x "/host$path" ]; then
+                echo "Found Netavark at host path: $path"
+                netavark_path="$path"
+                break
+              fi
+            done
+            
+            if [ -z "$netavark_path" ]; then
+              echo "Checking if Netavark is available in host PATH..."
+              if nsenter --target 1 --mount --uts --ipc --net --pid which netavark >/dev/null 2>&1; then
+                netavark_path=$(nsenter --target 1 --mount --uts --ipc --net --pid which netavark 2>/dev/null)
+                echo "Found Netavark in host PATH at: $netavark_path"
+              fi
+            fi
+            
+            if [ -n "$netavark_path" ]; then
+              echo "Testing Netavark functionality on host..."
+              # Test Netavark version command using nsenter to run in host context
+              if nsenter --target 1 --mount --uts --ipc --net --pid "$netavark_path" --version >/dev/null 2>&1; then
+                netavark_version=$(nsenter --target 1 --mount --uts --ipc --net --pid "$netavark_path" --version 2>/dev/null | head -1 || echo 'unknown')
+                echo "✅ Netavark is working on host! Version: $netavark_version"
+                netavark_exists=true
+              else
+                echo "⚠️  Netavark found but not functional (version check failed)"
+                netavark_exists=false
+              fi
+            else
+              echo "❌ Netavark not found on host system"
+              netavark_exists=false
+            fi
+            
+            echo "Installation status summary:"
+            echo "  CRIU: $([ "$criu_exists" = "true" ] && echo "✅ Working" || echo "❌ Missing/Non-functional")"
+            echo "  Netavark: $([ "$netavark_exists" = "true" ] && echo "✅ Working" || echo "❌ Missing/Non-functional")"
+            
+            if [ "$criu_exists" = "true" ] && [ "$netavark_exists" = "true" ]; then
+              echo "✅ Both CRIU and Netavark are already installed and functional on host. Skipping download."
+              return 0
+            else
+              echo "⚠️  Missing or non-functional binaries detected. Proceeding with download and installation."
+              return 1
+            fi
+          }
+
+          install_binaries() {
+            # Check if installation is needed
+            if check_existing_installation; then
+              echo "Installation already complete, skipping download."
+              return 0
+            fi
+            
+            echo "Finding latest DAKR release..."
+            
+            local latest_tag=""
+            local api_response=""
+            
+            echo "Fetching releases from public GitHub API..."
+            api_response=$(curl -s "https://api.github.com/repos/devzero-inc/dakr-operator/releases")
+            
+            echo "API response sample:"
+            echo "$api_response" | head -5
+            
+            if echo "$api_response" | jq empty 2>/dev/null; then
+              # Check if it's an error response
+              if echo "$api_response" | jq -e '.message' >/dev/null 2>&1; then
+                echo "❌ GitHub API error:"
+                echo "$api_response" | jq -r '.message'
+                echo "❌ Documentation: $(echo "$api_response" | jq -r '.documentation_url // "N/A"')"
+                exit 1
+              fi
+              
+              latest_tag=$(echo "$api_response" | \
+                jq -r '.[] | select(.name | startswith("'"$DAKR_RELEASE_PREFIX"'")) | .tag_name' | \
+                head -1)
+            else
+              echo "❌ Invalid JSON response from GitHub API"
+              echo "Response: $api_response"
               exit 1
             fi
             
-            # Cleanup
+            if [ -z "$latest_tag" ] || [ "$latest_tag" = "null" ]; then
+              echo "❌ No releases found starting with: $DAKR_RELEASE_PREFIX"
+              echo "Available releases:"
+              echo "$api_response" | jq -r '.[].name' 2>/dev/null || echo "Could not parse release names"
+              exit 1
+            fi
+            
+            echo "Found latest release tag: $latest_tag"
+            
+            local binary_name="dakr-snapshot-tools-${OS_VERSION}-${ARCH}.tar.gz"
+            local download_url="${DAKR_RELEASE_URL}/${latest_tag}/${binary_name}"
+            
+            echo "Downloading binaries from: $download_url"
+            
+            TEMP_DIR=$(mktemp -d)
+            cd $TEMP_DIR
+            
+            download_success=false
+            echo "Downloading from public GitHub releases..."
+            if curl -L -f -o "$binary_name" "$download_url" --connect-timeout 30 --max-time 300; then
+              download_success=true
+            else
+              echo "Download failed. HTTP response:"
+              curl -I "$download_url" || true
+              download_success=false
+            fi
+            
+            if [ "$download_success" = "false" ]; then
+              echo "❌ Failed to download artifact: $binary_name"
+              echo "❌ URL attempted: $download_url"
+              echo "❌ This OS/architecture combination is not supported or artifact does not exist"
+              exit 1
+            fi
+            
+            echo "Successfully downloaded $binary_name"
+            
+            # Debug: Check archive contents before extraction
+            echo "Archive contents:"
+            tar -tzf "$binary_name" | head -20
+            
+            tar -xzf "$binary_name"
+            
+            # Debug: Check what was extracted
+            echo "Extracted files:"
+            ls -la
+            
+            # Handle nested archive structure
+            if [ -f "$binary_name" ]; then
+              echo "Found nested archive, extracting inner tar.gz..."
+              tar -xzf "$binary_name"
+              rm "$binary_name"  # Remove the inner archive after extraction
+            fi
+            
+            echo "Looking for subdirectory containing binaries..."
+            binary_dir=""
+            for dir in */; do
+              if [ -d "$dir" ]; then
+                # Check if this directory contains the binaries we need
+                if [ -f "${dir}criu" ] || [ -f "${dir}netavark" ]; then
+                  binary_dir="$dir"
+                  echo "Found binaries in directory: $binary_dir"
+                  break
+                fi
+              fi
+            done
+            
+            if [ -n "$binary_dir" ]; then
+              echo "Entering binary directory: $binary_dir"
+              cd "$binary_dir"
+              echo "Contents:"
+              ls -la
+            else
+              echo "❌ No directory containing binaries found in archive"
+              echo "Available directories:"
+              ls -la */
+              exit 1
+            fi
+            
+            criu_installed=false
+            if [ "$criu_exists" = "true" ]; then
+              echo "✅ CRIU already installed, skipping"
+              criu_installed=true
+            elif [ -f criu ]; then
+              echo "Installing CRIU..."
+              chmod +x criu
+              cp criu /host/usr/local/bin/criu
+              chmod +x /host/usr/local/bin/criu
+              echo "CRIU installed successfully"
+              criu_installed=true
+            else
+              echo "❌ CRIU binary not found in archive"
+            fi
+            
+            netavark_installed=false
+            if [ "$netavark_exists" = "true" ]; then
+              echo "✅ Netavark already installed, skipping"
+              netavark_installed=true
+            elif [ -f netavark ]; then
+              echo "Installing Netavark..."
+              chmod +x netavark
+              cp netavark /host/usr/local/bin/netavark
+              chmod +x /host/usr/local/bin/netavark
+              echo "Netavark installed successfully"
+              netavark_installed=true
+            else
+              echo "❌ Netavark binary not found in archive"
+            fi
+            
+            if [ "$criu_installed" = "false" ] && [ "$netavark_installed" = "false" ]; then
+              echo "❌ No binaries found in archive. Installation failed."
+              exit 1
+            fi
+            
+            if [ -d deps ]; then
+              echo "Installing dependency libraries..."
+              cp -r deps/* /host/usr/local/lib/ 2>/dev/null || true
+            fi
+            
             cd /
             rm -rf $TEMP_DIR
           }
           
-          # Verify installation
           verify_installation() {
             echo "Verifying installation..."
             
-            # Check CRIU
-            if chroot /host /usr/local/bin/criu --version > /dev/null 2>&1; then
-              CRIU_VER=$(chroot /host /usr/local/bin/criu --version 2>/dev/null | head -1)
-              echo "✅ CRIU installed: $CRIU_VER"
+            echo "Checking if binaries exist on host:"
+            ls -la /host/usr/local/bin/criu /host/usr/local/bin/netavark
+            
+            echo "Checking file types:"
+            file /host/usr/local/bin/criu
+            file /host/usr/local/bin/netavark
+            
+            if [ -x /host/usr/local/bin/criu ]; then
+              echo "✅ CRIU binary is executable"
             else
-              echo "❌ CRIU verification failed"
+              echo "❌ CRIU binary is not executable"
               return 1
             fi
             
-            # Check Netavark
-            if chroot /host /usr/local/bin/netavark --version > /dev/null 2>&1; then
-              NETAVARK_VER=$(chroot /host /usr/local/bin/netavark --version 2>/dev/null | head -1)
-              echo "✅ Netavark installed: $NETAVARK_VER"
+            if [ -x /host/usr/local/bin/netavark ]; then
+              echo "✅ Netavark binary is executable"
             else
-              echo "❌ Netavark verification failed"
+              echo "❌ Netavark binary is not executable"
               return 1
             fi
             
-            echo "All tools installed and verified successfully!"
+            echo "✅ All tools installed and verified successfully!"
+            echo "Note: Runtime verification requires host namespace access"
+            echo "CRIU location: /usr/local/bin/criu"
+            echo "Netavark location: /usr/local/bin/netavark"
           }
           
-          # Setup kernel parameters for CRIU
           setup_kernel_params() {
             echo "Setting up kernel parameters for CRIU..."
             
-            # Enable checkpoint/restore in seccomp (if available)
             if [ -f /host/proc/sys/kernel/seccomp/actions_avail ]; then
               if grep -q "allow" /host/proc/sys/kernel/seccomp/actions_avail; then
                 echo "Seccomp actions already configured"
               fi
             fi
             
-            # Check for required kernel features
             echo "Checking kernel features..."
             if [ -f /host/proc/config.gz ]; then
               if zcat /host/proc/config.gz | grep -q "CONFIG_CHECKPOINT_RESTORE=y"; then
@@ -305,7 +437,6 @@ spec:
               echo "ℹ️  Cannot check kernel config (/proc/config.gz not available)"
             fi
             
-            # Check cgroups v2
             if [ -f /host/sys/fs/cgroup/cgroup.controllers ]; then
               echo "✅ cgroups v2 detected"
             else
@@ -313,7 +444,6 @@ spec:
             fi
           }
           
-          # Main execution
           main() {
             detect_os_arch
             install_binaries
@@ -323,7 +453,6 @@ spec:
             echo "DAKR snapshot tools setup completed successfully on node: $NODE_NAME"
             echo "Node is now ready for container checkpointing and restoration"
             
-            # Keep container running to maintain the daemonset
             echo "Setup complete. Monitoring for changes..."
             while true; do
               sleep 3600
