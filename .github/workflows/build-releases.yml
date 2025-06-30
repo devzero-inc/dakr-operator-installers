@@ -1,8 +1,6 @@
 name: Build CRIU and Netavark Releases
 
 on:
-  push:
-    branches: [ garvit/criu-netavark-releases ]
   workflow_dispatch:
     inputs:
       criu_version:
@@ -227,14 +225,14 @@ jobs:
           #   runner: ubuntu-24.04-arm64
           
           # Alpine builds - AMD64
-          - os: alpine
-            version: "3.18"
-            arch: amd64
-            runner: ubuntu-latest
-          - os: alpine
-            version: "3.19"
-            arch: amd64
-            runner: ubuntu-latest
+          # - os: alpine
+          #   version: "3.18"
+          #   arch: amd64
+          #   runner: ubuntu-latest
+          # - os: alpine
+          #   version: "3.19"
+          #   arch: amd64
+          #   runner: ubuntu-latest
           
           # Alpine builds - ARM64
           # - os: alpine

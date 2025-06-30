@@ -2,8 +2,8 @@
 ARG OS_VERSION=22.04
 FROM ubuntu:${OS_VERSION}
 
-ARG CRIU_VERSION=latest
-ARG NETAVARK_VERSION=latest
+ARG CRIU_VERSION=v4.1
+ARG NETAVARK_VERSION=v1.15.2
 ARG TARGET_ARCH=amd64
 
 # Set environment variables to avoid interactive prompts
@@ -32,6 +32,7 @@ RUN apt-get update && apt-get install -y \
     libnftables-dev \
     libdrm-dev \
     python3-protobuf \
+    uuid-dev \
     asciidoc \
     xmlto \
     ca-certificates \
@@ -62,16 +63,6 @@ WORKDIR /build
 
 # Build CRIU
 RUN mkdir -p criu && cd criu && \
-    if [ "$CRIU_VERSION" = "latest" ]; then \
-        CRIU_VERSION=$(curl -s https://api.github.com/repos/checkpoint-restore/criu/releases/latest | jq -r '.tag_name // empty' | head -1); \
-        if [ -z "$CRIU_VERSION" ] || [ "$CRIU_VERSION" = "null" ]; then \
-            CRIU_VERSION=$(curl -s https://api.github.com/repos/checkpoint-restore/criu/releases/latest | grep -o '"tag_name": "[^"]*' | cut -d'"' -f4); \
-        fi; \
-        if [ -z "$CRIU_VERSION" ] || [ "$CRIU_VERSION" = "null" ]; then \
-            echo "Warning: Could not fetch latest CRIU version, using v4.1 as fallback"; \
-            CRIU_VERSION="v4.1"; \
-        fi; \
-    fi && \
     echo "Building CRIU version: $CRIU_VERSION" && \
     git clone --depth 1 --branch "$CRIU_VERSION" https://github.com/checkpoint-restore/criu.git . && \
     if [ "$TARGET_ARCH" = "arm64" ] && [ "$(dpkg --print-architecture)" = "amd64" ]; then \
@@ -85,16 +76,6 @@ RUN mkdir -p criu && cd criu && \
 
 # Build Netavark
 RUN mkdir -p netavark && cd netavark && \
-    if [ "$NETAVARK_VERSION" = "latest" ]; then \
-        NETAVARK_VERSION=$(curl -s https://api.github.com/repos/containers/netavark/releases/latest | jq -r '.tag_name // empty' | head -1); \
-        if [ -z "$NETAVARK_VERSION" ] || [ "$NETAVARK_VERSION" = "null" ]; then \
-            NETAVARK_VERSION=$(curl -s https://api.github.com/repos/containers/netavark/releases/latest | grep -o '"tag_name": "[^"]*' | cut -d'"' -f4); \
-        fi; \
-        if [ -z "$NETAVARK_VERSION" ] || [ "$NETAVARK_VERSION" = "null" ]; then \
-            echo "Warning: Could not fetch latest Netavark version, using v1.15.2 as fallback"; \
-            NETAVARK_VERSION="v1.15.2"; \
-        fi; \
-    fi && \
     echo "Building Netavark version: $NETAVARK_VERSION" && \
     git clone --depth 1 --branch "$NETAVARK_VERSION" https://github.com/containers/netavark.git . && \
     # Optimize Rust compilation

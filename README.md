@@ -197,11 +197,11 @@ The DAKR operator relies on container snapshotting capabilities to optimize reso
 | Fedora | 38, 39, 40 | amd64, arm64 | ✅ Supported |
 | Amazon Linux | 2, 2023 | amd64, arm64 | ✅ Supported |
 | Debian | 11, 12 | amd64, arm64 | ✅ Supported |
-| Alpine | 3.18, 3.19 | amd64, arm64 | ✅ Supported |
 | CentOS | Stream 9 | amd64, arm64 | ✅ Supported |
+| Container-Optimized OS (COS) | stable, beta, dev | amd64, arm64 | 🚧 Under Development |
+| Alpine | 3.18, 3.19 | amd64, arm64 | 🚧 Under Development |
 | Rocky Linux | 8, 9 | amd64, arm64 | 🚧 Under Development |
 | RHEL | 7, 8, 9 | amd64, arm64 | 🚧 Under Development |
-| Container-Optimized OS (COS) | stable, beta, dev | amd64, arm64 | ✅ Supported |
 
 > **Note**: CentOS Stream 8 reached End of Life on May 31, 2024 and is no longer supported. Please use CentOS Stream 9, Rocky Linux, or other alternatives.
 
