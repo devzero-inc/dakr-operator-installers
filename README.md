@@ -194,15 +194,20 @@ The DAKR operator relies on container snapshotting capabilities to optimize reso
 | OS | Versions | Architectures | Status |
 |---|---|---|---|
 | Ubuntu | 20.04, 22.04, 24.04 | amd64, arm64 | ✅ Supported |
-| CentOS | Stream 9 | amd64, arm64 | ✅ Supported |
 | Fedora | 38, 39, 40 | amd64, arm64 | ✅ Supported |
 | Amazon Linux | 2, 2023 | amd64, arm64 | ✅ Supported |
-| Rocky Linux | 8, 9 | amd64, arm64 | ✅ Supported |
 | Debian | 11, 12 | amd64, arm64 | ✅ Supported |
 | Alpine | 3.18, 3.19 | amd64, arm64 | ✅ Supported |
-| RHEL | 7, 8, 9 | amd64, arm64 | ✅ Supported |
+| CentOS | Stream 9 | amd64, arm64 | ✅ Supported |
+| Rocky Linux | 8, 9 | amd64, arm64 | 🚧 Under Development |
+| RHEL | 7, 8, 9 | amd64, arm64 | 🚧 Under Development |
+| Container-Optimized OS (COS) | stable, beta, dev | amd64, arm64 | ✅ Supported |
 
 > **Note**: CentOS Stream 8 reached End of Life on May 31, 2024 and is no longer supported. Please use CentOS Stream 9, Rocky Linux, or other alternatives.
+
+> **Under Development**: CentOS, Rocky Linux, RHEL, and Container-Optimized OS (COS) support is currently under development. While build configurations exist, these platforms have not been fully tested and verified. Production use is not recommended until testing is complete.
+
+> **Container-Optimized OS (COS)**: Google's Container-Optimized OS is a lightweight, security-focused Linux distribution designed for running containers. Due to its read-only filesystem and minimal package set, CRIU/Netavark compatibility requires extensive testing and may have limitations.
 
 ### Quick Start
 
@@ -211,6 +216,10 @@ The DAKR operator relies on container snapshotting capabilities to optimize reso
 ```bash
 # Download for your platform (example: Ubuntu 22.04 amd64)
 wget https://github.com/YOUR_ORG/dakr-operator/releases/latest/download/dakr-snapshot-tools-ubuntu-22.04-amd64.tar.gz
+
+# Or for other supported platforms
+wget https://github.com/YOUR_ORG/dakr-operator/releases/latest/download/dakr-snapshot-tools-fedora-40-amd64.tar.gz
+wget https://github.com/YOUR_ORG/dakr-operator/releases/latest/download/dakr-snapshot-tools-amazonlinux-2023-amd64.tar.gz
 
 # Extract binaries
 tar -xzf dakr-snapshot-tools-ubuntu-22.04-amd64.tar.gz

@@ -187,14 +187,14 @@ jobs:
           #   runner: ubuntu-24.04-arm64
           
           # Rocky Linux builds - AMD64
-          - os: rockylinux
-            version: "8"
-            arch: amd64
-            runner: ubuntu-latest
-          - os: rockylinux
-            version: "9"
-            arch: amd64
-            runner: ubuntu-latest
+          # - os: rockylinux
+          #   version: "8"
+          #   arch: amd64
+          #   runner: ubuntu-latest
+          # - os: rockylinux
+          #   version: "9"
+          #   arch: amd64
+          #   runner: ubuntu-latest
           
           # Rocky Linux builds - ARM64
           # - os: rockylinux
@@ -243,6 +243,34 @@ jobs:
           #   runner: ubuntu-24.04-arm64
           # - os: alpine
           #   version: "3.19"
+          #   arch: arm64
+          #   runner: ubuntu-24.04-arm64
+          
+          # Container-Optimized OS builds - AMD64
+          - os: cos
+            version: "stable"
+            arch: amd64
+            runner: ubuntu-latest
+          - os: cos
+            version: "beta"
+            arch: amd64
+            runner: ubuntu-latest
+          - os: cos
+            version: "dev"
+            arch: amd64
+            runner: ubuntu-latest
+          
+          # Container-Optimized OS builds - ARM64
+          # - os: cos
+          #   version: "stable"
+          #   arch: arm64
+          #   runner: ubuntu-24.04-arm64
+          # - os: cos
+          #   version: "beta"
+          #   arch: arm64
+          #   runner: ubuntu-24.04-arm64
+          # - os: cos
+          #   version: "dev"
           #   arch: arm64
           #   runner: ubuntu-24.04-arm64
           

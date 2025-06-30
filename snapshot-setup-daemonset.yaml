@@ -80,6 +80,27 @@ spec:
             echo "Contents of /host/etc:"
             ls -la /host/etc/ | head -10
             
+            # Add comprehensive Amazon Linux detection
+            echo "Looking for Amazon Linux indicators..."
+            echo "Checking for AMZN-related files:"
+            find /host/etc -name "*amzn*" -o -name "*amazon*" 2>/dev/null | head -10 || echo "No AMZN files found"
+            
+            echo "Checking all potentially useful files in /host/etc:"
+            ls -la /host/etc/ | grep -E "(release|version|issue|motd)" || echo "No release files found"
+            
+            echo "Checking kernel version:"
+            cat /host/proc/version 2>/dev/null | head -1 || echo "Could not read /host/proc/version"
+            
+            echo "Checking DMI information for AWS/Amazon:"
+            cat /host/sys/class/dmi/id/sys_vendor 2>/dev/null || echo "DMI sys_vendor not available"
+            cat /host/sys/class/dmi/id/product_name 2>/dev/null || echo "DMI product_name not available"
+            
+            echo "Checking for cloud-init (common on Amazon Linux):"
+            [ -d /host/etc/cloud ] && echo "Found /host/etc/cloud directory" || echo "No cloud-init directory found"
+            
+            echo "Checking for yum.repos.d (RHEL-based check):"
+            [ -d /host/etc/yum.repos.d ] && ls /host/etc/yum.repos.d/ | head -3 || echo "No yum repos found"
+            
             if [ -f /host/etc/os-release ]; then
               echo "Found /host/etc/os-release:"
               cat /host/etc/os-release
@@ -89,12 +110,19 @@ spec:
                 debian) OS="debian" ;;
                 centos) OS="centos" ;;
                 rhel) OS="centos" ;;  # Use centos binaries for RHEL
-                fedora) OS="fedora" ;;
+                fedora) OS="centos" ;;  # Use centos binaries for Fedora
                 rocky) OS="rockylinux" ;;
                 almalinux) OS="centos" ;;  # Use centos binaries for AlmaLinux
                 amzn) OS="amazonlinux" ;;
                 alpine) OS="alpine" ;;
-                *) echo "Unsupported OS: $ID"; exit 1 ;;
+                cos) OS="cos" ;;  # Container-Optimized OS
+                ol) OS="centos" ;;  # Oracle Linux, use centos binaries
+                opensuse*) OS="centos" ;;  # OpenSUSE, use centos binaries
+                sles) OS="centos" ;;  # SUSE Linux Enterprise, use centos binaries
+                *) 
+                  echo "Warning: Unsupported OS: $ID, trying to use centos binaries as fallback"
+                  OS="centos"
+                  ;;
               esac
               VERSION_ID_MAJOR=$(echo $VERSION_ID | cut -d. -f1)
               
@@ -109,6 +137,23 @@ spec:
                 ubuntu)
                   OS_VERSION="ubuntu-${VERSION_ID}"
                   ;;
+                cos)
+                  # Container-Optimized OS version detection
+                  if [ -f /host/etc/cos-version ]; then
+                    COS_VERSION=$(cat /host/etc/cos-version | grep -o '[0-9]*\.[0-9]*\.[0-9]*' | head -1)
+                    if [ -n "$COS_VERSION" ]; then
+                      # Map COS version to release channel
+                      case $COS_VERSION in
+                        105.*|109.*) OS_VERSION="cos-stable" ;;
+                        *) OS_VERSION="cos-stable" ;;  # Default to stable
+                      esac
+                    else
+                      OS_VERSION="cos-stable"
+                    fi
+                  else
+                    OS_VERSION="cos-stable"
+                  fi
+                  ;;
                 *)
                   OS_VERSION="$OS"
                   ;;
@@ -116,24 +161,182 @@ spec:
             else
               echo "No /host/etc/os-release found, trying fallback methods..."
               
+              # Try /host/etc/lsb-release first
               if [ -f /host/etc/lsb-release ]; then
                 echo "Found /host/etc/lsb-release:"
                 cat /host/etc/lsb-release
                 . /host/etc/lsb-release
                 case $DISTRIB_ID in
                   Ubuntu) OS="ubuntu"; OS_VERSION="ubuntu-${DISTRIB_RELEASE}" ;;
-                  *) echo "Unsupported distribution: $DISTRIB_ID"; exit 1 ;;
+                  Debian) OS="debian"; OS_VERSION="debian" ;;
+                  *) 
+                    echo "Warning: Unsupported distribution from LSB: $DISTRIB_ID, using centos fallback"
+                    OS="centos"; OS_VERSION="centos"
+                    ;;
                 esac
+              
+              # Try /host/etc/redhat-release
               elif [ -f /host/etc/redhat-release ]; then
                 echo "Found /host/etc/redhat-release:"
                 cat /host/etc/redhat-release
-                OS="centos"
-                OS_VERSION="centos"
+                # Check for specific RHEL-based distributions
+                if grep -q -i "rocky" /host/etc/redhat-release; then
+                  OS="rockylinux"
+                  OS_VERSION="rockylinux"
+                elif grep -q -i "alma" /host/etc/redhat-release; then
+                  OS="centos"  # Use centos binaries for AlmaLinux
+                  OS_VERSION="centos"
+                elif grep -q -i "fedora" /host/etc/redhat-release; then
+                  OS="centos"  # Use centos binaries for Fedora
+                  OS_VERSION="centos"
+                else
+                  # Default to centos for any RHEL-based system
+                  OS="centos"
+                  OS_VERSION="centos"
+                fi
+              
+              # Try /host/etc/system-release (Amazon Linux)
+              elif [ -f /host/etc/system-release ]; then
+                echo "Found /host/etc/system-release:"
+                cat /host/etc/system-release
+                if grep -q "Amazon Linux" /host/etc/system-release; then
+                  if grep -q "release 2" /host/etc/system-release; then
+                    OS="amazonlinux"
+                    OS_VERSION="amazonlinux-2"
+                  else
+                    # Assume 2023 for newer Amazon Linux
+                    OS="amazonlinux"
+                    OS_VERSION="amazonlinux-2023"
+                  fi
+                else
+                  echo "Warning: Unsupported system-release format, using centos fallback"
+                  OS="centos"
+                  OS_VERSION="centos"
+                fi
+              
+              # Try /host/etc/amazon-linux-release (older Amazon Linux)
+              elif [ -f /host/etc/amazon-linux-release ]; then
+                echo "Found /host/etc/amazon-linux-release:"
+                cat /host/etc/amazon-linux-release
+                OS="amazonlinux"
+                OS_VERSION="amazonlinux-2"
+              
+              # Try additional detection methods
               else
-                # Final fallback - assume Ubuntu (common in minikube)
-                echo "Warning: Could not detect OS, assuming Ubuntu 22.04"
-                OS="ubuntu"
-                OS_VERSION="ubuntu-22.04"
+                echo "No standard distribution files found, trying comprehensive detection methods..."
+                
+                # First, try to detect Amazon Linux through multiple indicators
+                echo "=== Comprehensive Amazon Linux Detection ==="
+                amazon_detected=false
+                
+                # Check DMI information (most reliable for EC2)
+                if [ -f /host/sys/class/dmi/id/sys_vendor ]; then
+                  dmi_vendor=$(cat /host/sys/class/dmi/id/sys_vendor 2>/dev/null)
+                  echo "DMI vendor: $dmi_vendor"
+                  if echo "$dmi_vendor" | grep -q -i "amazon"; then
+                    echo "✅ Amazon detected from DMI vendor"
+                    amazon_detected=true
+                  fi
+                fi
+                
+                if [ -f /host/sys/class/dmi/id/product_name ]; then
+                  dmi_product=$(cat /host/sys/class/dmi/id/product_name 2>/dev/null)
+                  echo "DMI product: $dmi_product"
+                  if echo "$dmi_product" | grep -q -i "ec2"; then
+                    echo "✅ EC2 detected from DMI product"
+                    amazon_detected=true
+                  fi
+                fi
+                
+                # Check for cloud-init (very common on Amazon Linux)
+                if [ -d /host/etc/cloud ]; then
+                  echo "✅ Found cloud-init directory (common on Amazon Linux)"
+                  amazon_detected=true
+                fi
+                
+                # Check kernel version for amzn indicators
+                if [ -f /host/proc/version ]; then
+                  kernel_info=$(cat /host/proc/version 2>/dev/null)
+                  echo "Kernel version: $kernel_info"
+                  if echo "$kernel_info" | grep -q -i "amzn"; then
+                    echo "✅ Amazon Linux detected from kernel version"
+                    amazon_detected=true
+                  fi
+                fi
+                
+                # Check for yum repos with amzn patterns
+                if [ -d /host/etc/yum.repos.d ]; then
+                  echo "Checking yum repositories for Amazon patterns..."
+                  if ls /host/etc/yum.repos.d/*amzn* >/dev/null 2>&1; then
+                    echo "✅ Found Amazon repositories in yum.repos.d"
+                    amazon_detected=true
+                  elif ls /host/etc/yum.repos.d/ | grep -q -i amazon; then
+                    echo "✅ Found Amazon-related repositories"
+                    amazon_detected=true
+                  fi
+                fi
+                
+                # Check for specific Amazon Linux files that might exist
+                for file in /host/etc/image-id /host/etc/machine-id; do
+                  if [ -f "$file" ]; then
+                    echo "Checking $file for Amazon indicators:"
+                    if grep -q -i "amzn\|amazon" "$file" 2>/dev/null; then
+                      echo "✅ Amazon indicators found in $file"
+                      amazon_detected=true
+                    fi
+                  fi
+                done
+                
+                # If we detected Amazon Linux, assume it's 2023 (latest)
+                if [ "$amazon_detected" = "true" ]; then
+                  echo "🎯 Amazon Linux detected through multiple indicators!"
+                  OS="amazonlinux"
+                  OS_VERSION="amazonlinux-2023"
+                
+                # Check for Container-Optimized OS (COS)
+                elif [ -f /host/etc/cos-version ] || echo "$kernel_info" | grep -q -i "cos\|container-optimized"; then
+                  echo "🎯 Container-Optimized OS (COS) detected!"
+                  OS="cos"
+                  OS_VERSION="cos-stable"
+                
+                # If not Amazon Linux or COS, try other kernel-based detection
+                else
+                  echo "No Amazon Linux or COS detected, trying other distributions..."
+                  
+                  # Get kernel info using multiple methods
+                  kernel_info=""
+                  if [ -f /host/proc/version ]; then
+                    kernel_info=$(cat /host/proc/version 2>/dev/null || echo "")
+                  fi
+                  
+                  if [ -z "$kernel_info" ]; then
+                    kernel_info=$(chroot /host uname -a 2>/dev/null || nsenter --target 1 --mount --uts --ipc --net --pid uname -a 2>/dev/null || echo "unknown")
+                    echo "Kernel info from uname: $kernel_info"
+                  fi
+                  
+                  # Pattern matching for different distributions
+                  if echo "$kernel_info" | grep -q -i "ubuntu"; then
+                    echo "Detected Ubuntu from kernel info"
+                    OS="ubuntu"
+                    OS_VERSION="ubuntu-22.04"
+                  elif echo "$kernel_info" | grep -q -i "debian"; then
+                    echo "Detected Debian from kernel info"
+                    OS="debian"
+                    OS_VERSION="debian"
+                  elif echo "$kernel_info" | grep -q -E "(el7|el8|el9|\.el\.)"; then
+                    echo "Detected RHEL/CentOS from kernel info"
+                    OS="ubuntu"  # Use ubuntu instead of centos as fallback
+                    OS_VERSION="ubuntu-22.04"
+                  elif echo "$kernel_info" | grep -q -i "alpine"; then
+                    echo "Detected Alpine from kernel info"
+                    OS="alpine"
+                    OS_VERSION="alpine"
+                  else
+                    echo "Warning: Could not detect OS from kernel, using ubuntu fallback (more artifacts available)"
+                    OS="ubuntu"
+                    OS_VERSION="ubuntu-22.04"
+                  fi
+                fi
               fi
             fi
             

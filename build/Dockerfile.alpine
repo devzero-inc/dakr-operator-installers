@@ -2,7 +2,7 @@
 ARG OS_VERSION=3.19
 FROM alpine:${OS_VERSION}
 
-ARG CRIU_VERSION=latest
+ARG CRIU_VERSION=v4.1
 ARG NETAVARK_VERSION=latest
 ARG TARGET_ARCH=amd64
 
@@ -21,16 +21,23 @@ RUN apk add --no-cache \
     libnl3-dev \
     libnet-dev \
     libcap-dev \
+    libaio-dev \
+    util-linux-dev \
     linux-headers \
     gnutls-dev \
     nftables-dev \
     libdrm-dev \
     py3-protobuf \
+    py3-yaml \
     asciidoc \
     xmlto \
     ca-certificates \
     musl-dev \
-    jq
+    jq \
+    libbsd-dev \
+    util-linux-dev \
+    zlib-dev \
+    glib-dev
 
 # Install Rust for Netavark
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
@@ -59,14 +66,104 @@ RUN mkdir -p criu && cd criu && \
     fi && \
     echo "Building CRIU version: $CRIU_VERSION" && \
     git clone --depth 1 --branch "$CRIU_VERSION" https://github.com/checkpoint-restore/criu.git . && \
+    # Create a musl compatibility patch for CRIU
+#     cat > musl-compat.patch << 'EOF'
+# --- a/compel/arch/x86/plugins/std/syscalls/syscall-common-x86-64.S
+# +++ b/compel/arch/x86/plugins/std/syscalls/syscall-common-x86-64.S
+# @@ -1,3 +1,6 @@
+# +#include <errno.h>
+# +#include <string.h>
+# +#include <stddef.h>
+#  #include "common/asm/linkage.h"
+ 
+#  #define SYSCALL(name, opcode)		\
+# --- a/compel/include/uapi/infect.h
+# +++ b/compel/include/uapi/infect.h
+# @@ -1,6 +1,10 @@
+#  #ifndef UAPI_COMPEL_INFECT_H__
+#  #define UAPI_COMPEL_INFECT_H__
+ 
+# +#include <stddef.h>
+# +#include <limits.h>
+# +#include <errno.h>
+# +
+#  /*
+#   * Pid of task we're going to infect.
+#   */
+# EOF
+    # Apply basic musl compatibility fixes
+    echo "Applying musl compatibility patches..." && \
+    # Remove conflicting linux/time.h includes and replace with time.h
+    find . -name "*.c" -o -name "*.h" | xargs grep -l "#include <linux/time.h>" | while read file; do \
+        sed -i 's|#include <linux/time.h>|#include <time.h>|g' "$file"; \
+    done && \
+    # Fix specific struct conflicts in soccr
+    if [ -f "soccr/soccr.h" ]; then \
+        # Add required headers first
+        if ! grep -q "#include <netinet/tcp.h>" soccr/soccr.h; then \
+            sed -i '1i#include <netinet/tcp.h>' soccr/soccr.h; \
+        fi; \
+        sed -i '/struct timespec/d' soccr/soccr.h 2>/dev/null || true; \
+        sed -i '/struct timeval/d' soccr/soccr.h 2>/dev/null || true; \
+        # Fix tcp_repair_window struct redefinition
+        sed -i '/struct tcp_repair_window {/,/};/d' soccr/soccr.h 2>/dev/null || true; \
+    fi && \
     # Alpine-specific build adjustments (avoid static linking issues)
     if [ "$TARGET_ARCH" = "arm64" ] && [ "$(uname -m)" = "x86_64" ]; then \
         export ARCH=arm64; \
     elif [ "$TARGET_ARCH" = "amd64" ] && [ "$(uname -m)" = "aarch64" ]; then \
         export ARCH=x86_64; \
     fi && \
+    # Alpine/musl-specific header conflict fixes
+    echo "Patching CRIU headers for musl compatibility..." && \
+    # Fix specific header conflicts in compel
+    find . -name "*.h" -o -name "*.c" | xargs grep -l "struct timespec\|struct timeval" | while read file; do \
+        if grep -q "#include <linux/time.h>" "$file"; then \
+            sed -i '/#include <linux\/time.h>/d' "$file"; \
+        fi; \
+        if ! grep -q "#include <time.h>" "$file" && (grep -q "struct timespec\|struct timeval" "$file"); then \
+            sed -i '1i#include <time.h>' "$file"; \
+        fi; \
+    done && \
+    # Add missing standard headers to compel files
+    find compel/ -name "*.h" -o -name "*.c" | while read file; do \
+        if grep -q "NULL" "$file" && ! grep -q "#include <stddef.h>" "$file"; then \
+            sed -i '1i#include <stddef.h>' "$file"; \
+        fi; \
+        if grep -q "INT_MAX\|UINT_MAX" "$file" && ! grep -q "#include <limits.h>" "$file"; then \
+            sed -i '1i#include <limits.h>' "$file"; \
+        fi; \
+        if grep -q "errno" "$file" && ! grep -q "#include <errno.h>" "$file"; then \
+            sed -i '1i#include <errno.h>' "$file"; \
+        fi; \
+        if (grep -q "memset\|memcpy\|strerror\|strlen" "$file") && ! grep -q "#include <string.h>" "$file"; then \
+            sed -i '1i#include <string.h>' "$file"; \
+        fi; \
+    done && \
+    # Fix soccr source files
+    find soccr/ -name "*.c" -o -name "*.h" | while read file; do \
+        # Add required network headers for soccr
+        if [[ "$file" == *"soccr.c"* ]] && ! grep -q "#include <netinet/tcp.h>" "$file"; then \
+            sed -i '1i#include <netinet/tcp.h>' "$file"; \
+        fi; \
+        if grep -q "errno" "$file" && ! grep -q "#include <errno.h>" "$file"; then \
+            sed -i '1i#include <errno.h>' "$file"; \
+        fi; \
+        if (grep -q "memset\|memcpy\|strerror\|strlen" "$file") && ! grep -q "#include <string.h>" "$file"; then \
+            sed -i '1i#include <string.h>' "$file"; \
+        fi; \
+    done && \
+    # Alpine/musl-specific CRIU build flags
+    export CFLAGS="-D_GNU_SOURCE -D_DEFAULT_SOURCE -I/usr/include -Wno-error=unused-function -Wno-error=unused-variable" && \
+    export CPPFLAGS="-I/usr/include" && \
+    export LDFLAGS="-static" && \
+    # Patch CRIU's package check to work with Alpine
+    if [ -f "criu/Makefile.packages" ]; then \
+        sed -i 's/false/true/' criu/Makefile.packages; \
+    fi && \
     # Use optimized make build with parallel jobs and minimal targets
-    make -j$(nproc) WERROR=0 V=1 criu && \
+    # Skip package checks since Alpine packages have different names
+    make -j$(nproc) WERROR=0 V=1 COMPAT=n CONFIG_COMPAT=n SKIP_PACKAGES_CHECK=1 criu && \
     make install-criu PREFIX=/usr/local DESTDIR=
 
 # Build Netavark

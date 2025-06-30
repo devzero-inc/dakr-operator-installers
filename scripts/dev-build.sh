@@ -8,8 +8,8 @@ set -euo pipefail
 OS="ubuntu"
 VERSION="22.04"
 ARCH="amd64"
-CRIU_VERSION="latest"
-NETAVARK_VERSION="latest"
+CRIU_VERSION="v4.1"
+NETAVARK_VERSION="v1.15.2"
 
 # Help function
 show_help() {
@@ -19,11 +19,11 @@ Usage: $0 [OPTIONS]
 Test build CRIU and Netavark locally for development.
 
 OPTIONS:
-    --os OS                 Target OS (ubuntu, centos, fedora, amazonlinux, rockylinux, debian, alpine, rhel) [default: ubuntu]
+    --os OS                 Target OS (ubuntu, centos, fedora, amazonlinux, rockylinux, debian, alpine, cos, rhel) [default: ubuntu]
     --version VERSION       OS version [default: 22.04]
     --arch ARCH            Target architecture (amd64, arm64) [default: amd64]
-    --criu-version VER     CRIU version to build [default: latest]
-    --netavark-version VER Netavark version to build [default: latest]
+    --criu-version VER     CRIU version to build [default: v4.1]
+    --netavark-version VER Netavark version to build [default: v1.15.2]
     --help                 Show this help message
 
 EXAMPLES:

@@ -16,6 +16,7 @@ help:
 	@echo "  build-rocky    Build for Rocky Linux (all versions and architectures)"
 	@echo "  build-debian   Build for Debian (all versions and architectures)"
 	@echo "  build-alpine   Build for Alpine (all versions and architectures)"
+	@echo "  build-cos      Build for Container-Optimized OS (all versions and architectures)"
 	@echo "  build-rhel     Build for Red Hat Enterprise Linux (all versions and architectures)"
 	@echo "  build-all      Build for all supported platforms"
 	@echo "  build-native   Build for all platforms (native architecture only)"
@@ -108,6 +109,13 @@ build-alpine:
 	$(BUILD_SCRIPT) --os alpine --version 3.18 --arch $(NATIVE_ARCH) --criu-version $(CRIU_VERSION) --netavark-version $(NETAVARK_VERSION)
 	$(BUILD_SCRIPT) --os alpine --version 3.19 --arch $(NATIVE_ARCH) --criu-version $(CRIU_VERSION) --netavark-version $(NETAVARK_VERSION)
 
+# Container-Optimized OS builds
+build-cos:
+	@echo "Building for Container-Optimized OS platforms..."
+	$(BUILD_SCRIPT) --os cos --version stable --arch $(NATIVE_ARCH) --criu-version $(CRIU_VERSION) --netavark-version $(NETAVARK_VERSION)
+	$(BUILD_SCRIPT) --os cos --version beta --arch $(NATIVE_ARCH) --criu-version $(CRIU_VERSION) --netavark-version $(NETAVARK_VERSION)
+	$(BUILD_SCRIPT) --os cos --version dev --arch $(NATIVE_ARCH) --criu-version $(CRIU_VERSION) --netavark-version $(NETAVARK_VERSION)
+
 # RHEL builds
 build-rhel:
 	@echo "Building for Red Hat Enterprise Linux platforms..."
@@ -116,7 +124,7 @@ build-rhel:
 	$(BUILD_SCRIPT) --os rhel --version 9 --arch $(NATIVE_ARCH) --criu-version $(CRIU_VERSION) --netavark-version $(NETAVARK_VERSION)
 
 # Build all platforms (native architecture only)
-build-native: build-ubuntu build-centos build-fedora build-amazonlinux build-rocky build-debian build-alpine build-rhel
+build-native: build-ubuntu build-centos build-fedora build-amazonlinux build-rocky build-debian build-alpine build-cos build-rhel
 	@echo "All native builds completed!"
 
 # Build all platforms with cross-compilation
@@ -167,7 +175,7 @@ release:
 # Docker-specific targets
 docker-build:
 	@echo "Building Docker images for all platforms..."
-	@for os in ubuntu centos fedora amazonlinux rockylinux debian alpine rhel; do \
+	@for os in ubuntu centos fedora amazonlinux rockylinux debian alpine cos rhel; do \
 		for version in $$(case $$os in \
 			ubuntu) echo "20.04 22.04 24.04" ;; \
 			centos) echo "stream9" ;; \
@@ -176,6 +184,7 @@ docker-build:
 			rockylinux) echo "8 9" ;; \
 			debian) echo "11 12" ;; \
 			alpine) echo "3.18 3.19" ;; \
+			cos) echo "stable beta dev" ;; \
 			rhel) echo "7 8 9" ;; \
 		esac); do \
 			for arch in amd64 arm64; do \

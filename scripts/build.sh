@@ -6,8 +6,8 @@ set -euo pipefail
 OS=""
 VERSION=""
 ARCH=""
-CRIU_VERSION="latest"
-NETAVARK_VERSION="latest"
+CRIU_VERSION="v4.1"
+NETAVARK_VERSION="v1.15.2"
 OUTPUT_DIR="dist"
 CROSS_BUILD="false"
 HOST_ARCH=$(uname -m)
@@ -20,11 +20,11 @@ Usage: $0 [OPTIONS]
 Build CRIU and Netavark for specified OS/version/architecture combination.
 
 OPTIONS:
-    --os OS                 Target OS (ubuntu, centos, fedora, amazonlinux, rockylinux, debian, alpine, rhel)
+    --os OS                 Target OS (ubuntu, centos, fedora, amazonlinux, rockylinux, debian, alpine, cos, rhel)
     --version VERSION       OS version (e.g., 20.04, 22.04, 7, 8, 9, 11, 12, 3.18, 3.19)
     --arch ARCH            Target architecture (amd64, arm64)
-    --criu-version VER     CRIU version to build (default: latest)
-    --netavark-version VER Netavark version to build (default: latest)
+    --criu-version VER     CRIU version to build (default: v4.1)
+    --netavark-version VER Netavark version to build (default: v1.15.2)
     --output-dir DIR       Output directory (default: dist)
     --cross-build          Enable cross-platform builds (requires Docker buildx)
     --help                 Show this help message
@@ -92,11 +92,11 @@ fi
 
 # Validate OS
 case "$OS" in
-    ubuntu|centos|fedora|amazonlinux|rockylinux|debian|alpine|rhel)
+    ubuntu|centos|fedora|amazonlinux|rockylinux|debian|alpine|cos|rhel)
         ;;
     *)
         echo "Error: Unsupported OS '$OS'"
-        echo "Supported: ubuntu, centos, fedora, amazonlinux, rockylinux, debian, alpine, rhel"
+        echo "Supported: ubuntu, centos, fedora, amazonlinux, rockylinux, debian, alpine, cos, rhel"
         exit 1
         ;;
 esac
@@ -204,6 +204,9 @@ case "$OS" in
         ;;
     alpine)
         DOCKERFILE_NAME="Dockerfile.alpine"
+        ;;
+    cos)
+        DOCKERFILE_NAME="Dockerfile.cos"
         ;;
     rhel)
         DOCKERFILE_NAME="Dockerfile.rhel"

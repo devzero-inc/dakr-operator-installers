@@ -9,7 +9,7 @@ DEFAULT_NETAVARK_VERSION=v1.15.2
 RELEASE_TAG_FORMAT=${DEFAULT_CRIU_VERSION}-${DEFAULT_NETAVARK_VERSION}
 
 # Supported OS and architectures
-SUPPORTED_OS=["ubuntu", "debian", "centos", "rockylinux", "amazonlinux", "alpine"]
+SUPPORTED_OS=["ubuntu", "debian", "centos", "rockylinux", "amazonlinux", "alpine", "cos"]
 SUPPORTED_ARCH=["amd64", "arm64"]
 
 # Supported platforms configuration
@@ -54,6 +54,11 @@ base_image = "alpine"
 versions = ["7", "8", "9"]
 architectures = ["amd64", "arm64"]
 base_image = "registry.access.redhat.com/ubi"
+
+[platforms.cos]
+versions = ["stable", "beta", "dev"]
+architectures = ["amd64", "arm64"]
+base_image = "gcr.io/cos-cloud/cos"
 
 # Build configuration
 [build]

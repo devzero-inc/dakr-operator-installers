@@ -26,7 +26,7 @@ RUN if [ "${OS_VERSION}" = "stream9" ]; then \
 RUN if [ "${OS_VERSION}" = "stream9" ]; then \
         echo "Installing packages for CentOS Stream ${OS_VERSION}..." && \
         dnf groupinstall -y "Development Tools" && \
-        dnf install -y \
+        dnf install -y --allowerasing \
             pkg-config \
             git \
             curl \
@@ -43,6 +43,8 @@ RUN if [ "${OS_VERSION}" = "stream9" ]; then \
             gnutls-devel \
             libdrm-devel \
             python3-protobuf \
+            libuuid-devel \
+            python3-PyYAML \
             asciidoc \
             xmlto \
             ca-certificates \
