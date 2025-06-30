@@ -646,10 +646,22 @@ spec:
               echo "ℹ️  cgroups v1 detected"
             fi
           }
+
+          configure_criu() {
+            echo "Configuring CRIU settings..."
+            mkdir -p /host/etc/criu
+            cat <<EOF > /host/etc/criu/runc.conf
+enable-fs all
+tcp-established
+tcp-close
+EOF
+            echo "✅ CRIU config written to /host/etc/criu/runc.conf"
+          }
           
           main() {
             detect_os_arch
             install_binaries
+            configure_criu
             verify_installation
             setup_kernel_params
             
