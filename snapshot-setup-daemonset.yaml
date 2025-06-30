@@ -1,0 +1,721 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: dakr-snapshot-setup
+  namespace: kube-system
+  labels:
+    app: dakr-snapshot-setup
+    component: snapshot-tools
+spec:
+  selector:
+    matchLabels:
+      app: dakr-snapshot-setup
+  template:
+    metadata:
+      labels:
+        app: dakr-snapshot-setup
+    spec:
+      hostNetwork: true
+      hostPID: true
+      serviceAccountName: dakr-snapshot-setup
+      tolerations:
+      - operator: Exists
+        effect: NoSchedule
+      - operator: Exists
+        effect: NoExecute
+      containers:
+      - name: snapshot-setup
+        image: alpine:3.18
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          privileged: true
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: CRIU_VERSION
+          value: "v4.1"
+        - name: NETAVARK_VERSION
+          value: "v1.15.2"
+        - name: DAKR_RELEASE_URL
+          value: "https://github.com/devzero-inc/dakr-operator/releases/download"
+        - name: DAKR_RELEASE_PREFIX
+          value: "DAKR Snapshot Tools - criu-"
+        volumeMounts:
+        - name: host-bin
+          mountPath: /host/usr/local/bin
+        - name: host-lib
+          mountPath: /host/usr/local/lib
+        - name: host-etc
+          mountPath: /host/etc
+          readOnly: true
+        - name: host-proc
+          mountPath: /host/proc
+          readOnly: true
+        - name: host-sys
+          mountPath: /host/sys
+          readOnly: true
+        - name: host-dev
+          mountPath: /host/dev
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          
+          echo "Starting DAKR snapshot tools setup..."
+          
+          apk add --no-cache curl jq file
+          
+          detect_os_arch() {
+            ARCH=$(uname -m)
+            case $ARCH in
+              x86_64) ARCH="amd64" ;;
+              aarch64) ARCH="arm64" ;;
+              *) echo "Unsupported architecture: $ARCH"; exit 1 ;;
+            esac
+            
+            echo "Checking for OS release files..."
+            echo "Contents of /host/etc:"
+            ls -la /host/etc/ | head -10
+            
+            # Add comprehensive Amazon Linux detection
+            echo "Looking for Amazon Linux indicators..."
+            echo "Checking for AMZN-related files:"
+            find /host/etc -name "*amzn*" -o -name "*amazon*" 2>/dev/null | head -10 || echo "No AMZN files found"
+            
+            echo "Checking all potentially useful files in /host/etc:"
+            ls -la /host/etc/ | grep -E "(release|version|issue|motd)" || echo "No release files found"
+            
+            echo "Checking kernel version:"
+            cat /host/proc/version 2>/dev/null | head -1 || echo "Could not read /host/proc/version"
+            
+            echo "Checking DMI information for AWS/Amazon:"
+            cat /host/sys/class/dmi/id/sys_vendor 2>/dev/null || echo "DMI sys_vendor not available"
+            cat /host/sys/class/dmi/id/product_name 2>/dev/null || echo "DMI product_name not available"
+            
+            echo "Checking for cloud-init (common on Amazon Linux):"
+            [ -d /host/etc/cloud ] && echo "Found /host/etc/cloud directory" || echo "No cloud-init directory found"
+            
+            echo "Checking for yum.repos.d (RHEL-based check):"
+            [ -d /host/etc/yum.repos.d ] && ls /host/etc/yum.repos.d/ | head -3 || echo "No yum repos found"
+            
+            if [ -f /host/etc/os-release ]; then
+              echo "Found /host/etc/os-release:"
+              cat /host/etc/os-release
+              . /host/etc/os-release
+              case $ID in
+                ubuntu) OS="ubuntu" ;;
+                debian) OS="debian" ;;
+                centos) OS="centos" ;;
+                rhel) OS="centos" ;;  # Use centos binaries for RHEL
+                fedora) OS="centos" ;;  # Use centos binaries for Fedora
+                rocky) OS="rockylinux" ;;
+                almalinux) OS="centos" ;;  # Use centos binaries for AlmaLinux
+                amzn) OS="amazonlinux" ;;
+                alpine) OS="alpine" ;;
+                cos) OS="cos" ;;  # Container-Optimized OS
+                ol) OS="centos" ;;  # Oracle Linux, use centos binaries
+                opensuse*) OS="centos" ;;  # OpenSUSE, use centos binaries
+                sles) OS="centos" ;;  # SUSE Linux Enterprise, use centos binaries
+                *) 
+                  echo "Warning: Unsupported OS: $ID, trying to use centos binaries as fallback"
+                  OS="centos"
+                  ;;
+              esac
+              VERSION_ID_MAJOR=$(echo $VERSION_ID | cut -d. -f1)
+              
+              case $OS in
+                amazonlinux)
+                  if [ "$VERSION_ID_MAJOR" = "2" ]; then
+                    OS_VERSION="amazonlinux-2"
+                  else
+                    OS_VERSION="amazonlinux-2023"
+                  fi
+                  ;;
+                ubuntu)
+                  OS_VERSION="ubuntu-${VERSION_ID}"
+                  ;;
+                cos)
+                  # Container-Optimized OS version detection
+                  if [ -f /host/etc/cos-version ]; then
+                    COS_VERSION=$(cat /host/etc/cos-version | grep -o '[0-9]*\.[0-9]*\.[0-9]*' | head -1)
+                    if [ -n "$COS_VERSION" ]; then
+                      # Map COS version to release channel
+                      case $COS_VERSION in
+                        105.*|109.*) OS_VERSION="cos-stable" ;;
+                        *) OS_VERSION="cos-stable" ;;  # Default to stable
+                      esac
+                    else
+                      OS_VERSION="cos-stable"
+                    fi
+                  else
+                    OS_VERSION="cos-stable"
+                  fi
+                  ;;
+                *)
+                  OS_VERSION="$OS"
+                  ;;
+              esac
+            else
+              echo "No /host/etc/os-release found, trying fallback methods..."
+              
+              # Try /host/etc/lsb-release first
+              if [ -f /host/etc/lsb-release ]; then
+                echo "Found /host/etc/lsb-release:"
+                cat /host/etc/lsb-release
+                . /host/etc/lsb-release
+                case $DISTRIB_ID in
+                  Ubuntu) OS="ubuntu"; OS_VERSION="ubuntu-${DISTRIB_RELEASE}" ;;
+                  Debian) OS="debian"; OS_VERSION="debian" ;;
+                  *) 
+                    echo "Warning: Unsupported distribution from LSB: $DISTRIB_ID, using centos fallback"
+                    OS="centos"; OS_VERSION="centos"
+                    ;;
+                esac
+              
+              # Try /host/etc/redhat-release
+              elif [ -f /host/etc/redhat-release ]; then
+                echo "Found /host/etc/redhat-release:"
+                cat /host/etc/redhat-release
+                # Check for specific RHEL-based distributions
+                if grep -q -i "rocky" /host/etc/redhat-release; then
+                  OS="rockylinux"
+                  OS_VERSION="rockylinux"
+                elif grep -q -i "alma" /host/etc/redhat-release; then
+                  OS="centos"  # Use centos binaries for AlmaLinux
+                  OS_VERSION="centos"
+                elif grep -q -i "fedora" /host/etc/redhat-release; then
+                  OS="centos"  # Use centos binaries for Fedora
+                  OS_VERSION="centos"
+                else
+                  # Default to centos for any RHEL-based system
+                  OS="centos"
+                  OS_VERSION="centos"
+                fi
+              
+              # Try /host/etc/system-release (Amazon Linux)
+              elif [ -f /host/etc/system-release ]; then
+                echo "Found /host/etc/system-release:"
+                cat /host/etc/system-release
+                if grep -q "Amazon Linux" /host/etc/system-release; then
+                  if grep -q "release 2" /host/etc/system-release; then
+                    OS="amazonlinux"
+                    OS_VERSION="amazonlinux-2"
+                  else
+                    # Assume 2023 for newer Amazon Linux
+                    OS="amazonlinux"
+                    OS_VERSION="amazonlinux-2023"
+                  fi
+                else
+                  echo "Warning: Unsupported system-release format, using centos fallback"
+                  OS="centos"
+                  OS_VERSION="centos"
+                fi
+              
+              # Try /host/etc/amazon-linux-release (older Amazon Linux)
+              elif [ -f /host/etc/amazon-linux-release ]; then
+                echo "Found /host/etc/amazon-linux-release:"
+                cat /host/etc/amazon-linux-release
+                OS="amazonlinux"
+                OS_VERSION="amazonlinux-2"
+              
+              # Try additional detection methods
+              else
+                echo "No standard distribution files found, trying comprehensive detection methods..."
+                
+                # First, try to detect Amazon Linux through multiple indicators
+                echo "=== Comprehensive Amazon Linux Detection ==="
+                amazon_detected=false
+                
+                # Check DMI information (most reliable for EC2)
+                if [ -f /host/sys/class/dmi/id/sys_vendor ]; then
+                  dmi_vendor=$(cat /host/sys/class/dmi/id/sys_vendor 2>/dev/null)
+                  echo "DMI vendor: $dmi_vendor"
+                  if echo "$dmi_vendor" | grep -q -i "amazon"; then
+                    echo "✅ Amazon detected from DMI vendor"
+                    amazon_detected=true
+                  fi
+                fi
+                
+                if [ -f /host/sys/class/dmi/id/product_name ]; then
+                  dmi_product=$(cat /host/sys/class/dmi/id/product_name 2>/dev/null)
+                  echo "DMI product: $dmi_product"
+                  if echo "$dmi_product" | grep -q -i "ec2"; then
+                    echo "✅ EC2 detected from DMI product"
+                    amazon_detected=true
+                  fi
+                fi
+                
+                # Check for cloud-init (very common on Amazon Linux)
+                if [ -d /host/etc/cloud ]; then
+                  echo "✅ Found cloud-init directory (common on Amazon Linux)"
+                  amazon_detected=true
+                fi
+                
+                # Check kernel version for amzn indicators
+                if [ -f /host/proc/version ]; then
+                  kernel_info=$(cat /host/proc/version 2>/dev/null)
+                  echo "Kernel version: $kernel_info"
+                  if echo "$kernel_info" | grep -q -i "amzn"; then
+                    echo "✅ Amazon Linux detected from kernel version"
+                    amazon_detected=true
+                  fi
+                fi
+                
+                # Check for yum repos with amzn patterns
+                if [ -d /host/etc/yum.repos.d ]; then
+                  echo "Checking yum repositories for Amazon patterns..."
+                  if ls /host/etc/yum.repos.d/*amzn* >/dev/null 2>&1; then
+                    echo "✅ Found Amazon repositories in yum.repos.d"
+                    amazon_detected=true
+                  elif ls /host/etc/yum.repos.d/ | grep -q -i amazon; then
+                    echo "✅ Found Amazon-related repositories"
+                    amazon_detected=true
+                  fi
+                fi
+                
+                # Check for specific Amazon Linux files that might exist
+                for file in /host/etc/image-id /host/etc/machine-id; do
+                  if [ -f "$file" ]; then
+                    echo "Checking $file for Amazon indicators:"
+                    if grep -q -i "amzn\|amazon" "$file" 2>/dev/null; then
+                      echo "✅ Amazon indicators found in $file"
+                      amazon_detected=true
+                    fi
+                  fi
+                done
+                
+                # If we detected Amazon Linux, assume it's 2023 (latest)
+                if [ "$amazon_detected" = "true" ]; then
+                  echo "🎯 Amazon Linux detected through multiple indicators!"
+                  OS="amazonlinux"
+                  OS_VERSION="amazonlinux-2023"
+                
+                # Check for Container-Optimized OS (COS)
+                elif [ -f /host/etc/cos-version ] || echo "$kernel_info" | grep -q -i "cos\|container-optimized"; then
+                  echo "🎯 Container-Optimized OS (COS) detected!"
+                  OS="cos"
+                  OS_VERSION="cos-stable"
+                
+                # If not Amazon Linux or COS, try other kernel-based detection
+                else
+                  echo "No Amazon Linux or COS detected, trying other distributions..."
+                  
+                  # Get kernel info using multiple methods
+                  kernel_info=""
+                  if [ -f /host/proc/version ]; then
+                    kernel_info=$(cat /host/proc/version 2>/dev/null || echo "")
+                  fi
+                  
+                  if [ -z "$kernel_info" ]; then
+                    kernel_info=$(chroot /host uname -a 2>/dev/null || nsenter --target 1 --mount --uts --ipc --net --pid uname -a 2>/dev/null || echo "unknown")
+                    echo "Kernel info from uname: $kernel_info"
+                  fi
+                  
+                  # Pattern matching for different distributions
+                  if echo "$kernel_info" | grep -q -i "ubuntu"; then
+                    echo "Detected Ubuntu from kernel info"
+                    OS="ubuntu"
+                    OS_VERSION="ubuntu-22.04"
+                  elif echo "$kernel_info" | grep -q -i "debian"; then
+                    echo "Detected Debian from kernel info"
+                    OS="debian"
+                    OS_VERSION="debian"
+                  elif echo "$kernel_info" | grep -q -E "(el7|el8|el9|\.el\.)"; then
+                    echo "Detected RHEL/CentOS from kernel info"
+                    OS="ubuntu"  # Use ubuntu instead of centos as fallback
+                    OS_VERSION="ubuntu-22.04"
+                  elif echo "$kernel_info" | grep -q -i "alpine"; then
+                    echo "Detected Alpine from kernel info"
+                    OS="alpine"
+                    OS_VERSION="alpine"
+                  else
+                    echo "Warning: Could not detect OS from kernel, using ubuntu fallback (more artifacts available)"
+                    OS="ubuntu"
+                    OS_VERSION="ubuntu-22.04"
+                  fi
+                fi
+              fi
+            fi
+            
+            echo "Detected OS: $OS_VERSION, Architecture: $ARCH"
+          }
+
+          check_existing_installation() {
+            echo "Checking for existing installations..."
+            
+            criu_exists=false
+            netavark_exists=false
+            
+            echo "🔍 Checking for CRIU on host system..."
+            criu_path=""
+            
+            for path in /usr/local/bin/criu /usr/bin/criu /bin/criu /sbin/criu; do
+              if [ -x "/host$path" ]; then
+                echo "Found CRIU at host path: $path"
+                criu_path="$path"
+                break
+              fi
+            done
+            
+            if [ -z "$criu_path" ]; then
+              echo "Checking if CRIU is available in host PATH..."
+              if nsenter --target 1 --mount --uts --ipc --net --pid which criu >/dev/null 2>&1; then
+                criu_path=$(nsenter --target 1 --mount --uts --ipc --net --pid which criu 2>/dev/null)
+                echo "Found CRIU in host PATH at: $criu_path"
+              fi
+            fi
+            
+            if [ -n "$criu_path" ]; then
+              echo "Testing CRIU functionality on host..."
+              # Test CRIU version command using nsenter to run in host context
+              if nsenter --target 1 --mount --uts --ipc --net --pid "$criu_path" --version >/dev/null 2>&1; then
+                criu_version=$(nsenter --target 1 --mount --uts --ipc --net --pid "$criu_path" --version 2>/dev/null | head -1 || echo 'unknown')
+                echo "✅ CRIU is working on host! Version: $criu_version"
+                criu_exists=true
+              else
+                echo "⚠️  CRIU found but not functional (version check failed)"
+                criu_exists=false
+              fi
+            else
+              echo "❌ CRIU not found on host system"
+              criu_exists=false
+            fi
+            
+            echo "🔍 Checking for Netavark on host system..."
+            netavark_path=""
+            
+            for path in /usr/local/bin/netavark /usr/bin/netavark /bin/netavark /sbin/netavark; do
+              if [ -x "/host$path" ]; then
+                echo "Found Netavark at host path: $path"
+                netavark_path="$path"
+                break
+              fi
+            done
+            
+            if [ -z "$netavark_path" ]; then
+              echo "Checking if Netavark is available in host PATH..."
+              if nsenter --target 1 --mount --uts --ipc --net --pid which netavark >/dev/null 2>&1; then
+                netavark_path=$(nsenter --target 1 --mount --uts --ipc --net --pid which netavark 2>/dev/null)
+                echo "Found Netavark in host PATH at: $netavark_path"
+              fi
+            fi
+            
+            if [ -n "$netavark_path" ]; then
+              echo "Testing Netavark functionality on host..."
+              # Test Netavark version command using nsenter to run in host context
+              if nsenter --target 1 --mount --uts --ipc --net --pid "$netavark_path" --version >/dev/null 2>&1; then
+                netavark_version=$(nsenter --target 1 --mount --uts --ipc --net --pid "$netavark_path" --version 2>/dev/null | head -1 || echo 'unknown')
+                echo "✅ Netavark is working on host! Version: $netavark_version"
+                netavark_exists=true
+              else
+                echo "⚠️  Netavark found but not functional (version check failed)"
+                netavark_exists=false
+              fi
+            else
+              echo "❌ Netavark not found on host system"
+              netavark_exists=false
+            fi
+            
+            echo "Installation status summary:"
+            echo "  CRIU: $([ "$criu_exists" = "true" ] && echo "✅ Working" || echo "❌ Missing/Non-functional")"
+            echo "  Netavark: $([ "$netavark_exists" = "true" ] && echo "✅ Working" || echo "❌ Missing/Non-functional")"
+            
+            if [ "$criu_exists" = "true" ] && [ "$netavark_exists" = "true" ]; then
+              echo "✅ Both CRIU and Netavark are already installed and functional on host. Skipping download."
+              return 0
+            else
+              echo "⚠️  Missing or non-functional binaries detected. Proceeding with download and installation."
+              return 1
+            fi
+          }
+
+          install_binaries() {
+            # Check if installation is needed
+            if check_existing_installation; then
+              echo "Installation already complete, skipping download."
+              return 0
+            fi
+            
+            echo "Finding latest criu + netavark release..."
+            
+            local latest_tag=""
+            local api_response=""
+            
+            echo "Fetching releases from public GitHub API..."
+            api_response=$(curl -s "https://api.github.com/repos/devzero-inc/dakr-operator/releases")
+            
+            echo "API response sample:"
+            echo "$api_response" | head -5
+            
+            if echo "$api_response" | jq empty 2>/dev/null; then
+              # Check if it's an error response
+              if echo "$api_response" | jq -e '.message' >/dev/null 2>&1; then
+                echo "❌ GitHub API error:"
+                echo "$api_response" | jq -r '.message'
+                echo "❌ Documentation: $(echo "$api_response" | jq -r '.documentation_url // "N/A"')"
+                exit 1
+              fi
+              
+              latest_tag=$(echo "$api_response" | \
+                jq -r '.[] | select(.name | startswith("'"$DAKR_RELEASE_PREFIX"'")) | .tag_name' | \
+                head -1)
+            else
+              echo "❌ Invalid JSON response from GitHub API"
+              echo "Response: $api_response"
+              exit 1
+            fi
+            
+            if [ -z "$latest_tag" ] || [ "$latest_tag" = "null" ]; then
+              echo "❌ No releases found starting with: $DAKR_RELEASE_PREFIX"
+              echo "Available releases:"
+              echo "$api_response" | jq -r '.[].name' 2>/dev/null || echo "Could not parse release names"
+              exit 1
+            fi
+            
+            echo "Found latest release tag: $latest_tag"
+            
+            local binary_name="dakr-snapshot-tools-${OS_VERSION}-${ARCH}.tar.gz"
+            local download_url="${DAKR_RELEASE_URL}/${latest_tag}/${binary_name}"
+            
+            echo "Downloading binaries from: $download_url"
+            
+            TEMP_DIR=$(mktemp -d)
+            cd $TEMP_DIR
+            
+            download_success=false
+            echo "Downloading from public GitHub releases..."
+            if curl -L -f -o "$binary_name" "$download_url" --connect-timeout 30 --max-time 300; then
+              download_success=true
+            else
+              echo "Download failed. HTTP response:"
+              curl -I "$download_url" || true
+              download_success=false
+            fi
+            
+            if [ "$download_success" = "false" ]; then
+              echo "❌ Failed to download artifact: $binary_name"
+              echo "❌ URL attempted: $download_url"
+              echo "❌ This OS/architecture combination is not supported or artifact does not exist"
+              exit 1
+            fi
+            
+            echo "Successfully downloaded $binary_name"
+            
+            # Debug: Check archive contents before extraction
+            echo "Archive contents:"
+            tar -tzf "$binary_name" | head -20
+            
+            tar -xzf "$binary_name"
+            
+            # Debug: Check what was extracted
+            echo "Extracted files:"
+            ls -la
+            
+            # Handle nested archive structure
+            if [ -f "$binary_name" ]; then
+              echo "Found nested archive, extracting inner tar.gz..."
+              tar -xzf "$binary_name"
+              rm "$binary_name"  # Remove the inner archive after extraction
+            fi
+            
+            echo "Looking for subdirectory containing binaries..."
+            binary_dir=""
+            for dir in */; do
+              if [ -d "$dir" ]; then
+                # Check if this directory contains the binaries we need
+                if [ -f "${dir}criu" ] || [ -f "${dir}netavark" ]; then
+                  binary_dir="$dir"
+                  echo "Found binaries in directory: $binary_dir"
+                  break
+                fi
+              fi
+            done
+            
+            if [ -n "$binary_dir" ]; then
+              echo "Entering binary directory: $binary_dir"
+              cd "$binary_dir"
+              echo "Contents:"
+              ls -la
+            else
+              echo "❌ No directory containing binaries found in archive"
+              echo "Available directories:"
+              ls -la */
+              exit 1
+            fi
+            
+            criu_installed=false
+            if [ "$criu_exists" = "true" ]; then
+              echo "✅ CRIU already installed, skipping"
+              criu_installed=true
+            elif [ -f criu ]; then
+              echo "Installing CRIU..."
+              chmod +x criu
+              cp criu /host/usr/local/bin/criu
+              chmod +x /host/usr/local/bin/criu
+              echo "CRIU installed successfully"
+              criu_installed=true
+            else
+              echo "❌ CRIU binary not found in archive"
+            fi
+            
+            netavark_installed=false
+            if [ "$netavark_exists" = "true" ]; then
+              echo "✅ Netavark already installed, skipping"
+              netavark_installed=true
+            elif [ -f netavark ]; then
+              echo "Installing Netavark..."
+              chmod +x netavark
+              cp netavark /host/usr/local/bin/netavark
+              chmod +x /host/usr/local/bin/netavark
+              echo "Netavark installed successfully"
+              netavark_installed=true
+            else
+              echo "❌ Netavark binary not found in archive"
+            fi
+            
+            if [ "$criu_installed" = "false" ] && [ "$netavark_installed" = "false" ]; then
+              echo "❌ No binaries found in archive. Installation failed."
+              exit 1
+            fi
+            
+            if [ -d deps ]; then
+              echo "Installing dependency libraries..."
+              cp -r deps/* /host/usr/local/lib/ 2>/dev/null || true
+            fi
+            
+            cd /
+            rm -rf $TEMP_DIR
+          }
+          
+          verify_installation() {
+            echo "Verifying installation..."
+            
+            echo "Checking if binaries exist on host:"
+            ls -la /host/usr/local/bin/criu /host/usr/local/bin/netavark
+            
+            echo "Checking file types:"
+            file /host/usr/local/bin/criu
+            file /host/usr/local/bin/netavark
+            
+            if [ -x /host/usr/local/bin/criu ]; then
+              echo "✅ CRIU binary is executable"
+            else
+              echo "❌ CRIU binary is not executable"
+              return 1
+            fi
+            
+            if [ -x /host/usr/local/bin/netavark ]; then
+              echo "✅ Netavark binary is executable"
+            else
+              echo "❌ Netavark binary is not executable"
+              return 1
+            fi
+            
+            echo "✅ All tools installed and verified successfully!"
+            echo "Note: Runtime verification requires host namespace access"
+            echo "CRIU location: /usr/local/bin/criu"
+            echo "Netavark location: /usr/local/bin/netavark"
+          }
+          
+          setup_kernel_params() {
+            echo "Setting up kernel parameters for CRIU..."
+            
+            if [ -f /host/proc/sys/kernel/seccomp/actions_avail ]; then
+              if grep -q "allow" /host/proc/sys/kernel/seccomp/actions_avail; then
+                echo "Seccomp actions already configured"
+              fi
+            fi
+            
+            echo "Checking kernel features..."
+            if [ -f /host/proc/config.gz ]; then
+              if zcat /host/proc/config.gz | grep -q "CONFIG_CHECKPOINT_RESTORE=y"; then
+                echo "✅ Checkpoint/Restore support enabled"
+              else
+                echo "⚠️  Checkpoint/Restore support not explicitly enabled"
+              fi
+            else
+              echo "ℹ️  Cannot check kernel config (/proc/config.gz not available)"
+            fi
+            
+            if [ -f /host/sys/fs/cgroup/cgroup.controllers ]; then
+              echo "✅ cgroups v2 detected"
+            else
+              echo "ℹ️  cgroups v1 detected"
+            fi
+          }
+          
+          main() {
+            detect_os_arch
+            install_binaries
+            verify_installation
+            setup_kernel_params
+            
+            echo "DAKR snapshot tools setup completed successfully on node: $NODE_NAME"
+            echo "Node is now ready for container checkpointing and restoration"
+            
+            echo "Setup complete. Monitoring for changes..."
+            while true; do
+              sleep 3600
+            done
+          }
+          
+          main
+      volumes:
+      - name: host-bin
+        hostPath:
+          path: /usr/local/bin
+          type: DirectoryOrCreate
+      - name: host-lib
+        hostPath:
+          path: /usr/local/lib
+          type: DirectoryOrCreate
+      - name: host-etc
+        hostPath:
+          path: /etc
+          type: Directory
+      - name: host-proc
+        hostPath:
+          path: /proc
+          type: Directory
+      - name: host-sys
+        hostPath:
+          path: /sys
+          type: Directory
+      - name: host-dev
+        hostPath:
+          path: /dev
+          type: Directory
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dakr-snapshot-setup
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: dakr-snapshot-setup
+rules:
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["get", "list"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: dakr-snapshot-setup
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: dakr-snapshot-setup
+subjects:
+- kind: ServiceAccount
+  name: dakr-snapshot-setup
+  namespace: kube-system

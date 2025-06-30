@@ -25,3 +25,14 @@ go.work
 *.swp
 *.swo
 *~
+
+# Build artifacts
+dist/
+releases/
+build/context-*
+*.tar.gz
+*.zip
+
+# Runtime artifacts
+.env
+.env.local
