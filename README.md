@@ -215,11 +215,11 @@ The DAKR operator relies on container snapshotting capabilities to optimize reso
 
 ```bash
 # Download for your platform (example: Ubuntu 22.04 amd64)
-wget https://github.com/YOUR_ORG/dakr-operator/releases/latest/download/dakr-snapshot-tools-ubuntu-22.04-amd64.tar.gz
+wget https://github.com/devzero-inc/dakr-operator/releases/latest/download/dakr-snapshot-tools-ubuntu-22.04-amd64.tar.gz
 
 # Or for other supported platforms
-wget https://github.com/YOUR_ORG/dakr-operator/releases/latest/download/dakr-snapshot-tools-fedora-40-amd64.tar.gz
-wget https://github.com/YOUR_ORG/dakr-operator/releases/latest/download/dakr-snapshot-tools-amazonlinux-2023-amd64.tar.gz
+wget https://github.com/devzero-inc/dakr-operator/releases/latest/download/dakr-snapshot-tools-fedora-40-amd64.tar.gz
+wget https://github.com/devzero-inc/dakr-operator/releases/latest/download/dakr-snapshot-tools-amazonlinux-2023-amd64.tar.gz
 
 # Extract binaries
 tar -xzf dakr-snapshot-tools-ubuntu-22.04-amd64.tar.gz
@@ -260,7 +260,7 @@ make test
 
 ```bash
 # Clone the repository
-git clone https://github.com/YOUR_ORG/dakr-operator.git
+git clone https://github.com/devzero-inc/dakr-operator.git
 cd dakr-operator
 
 # Build for local development
