@@ -1,6 +1,6 @@
 output "gcp_service_account_email" {
   description = "Email of the Google Cloud Service Account created for the DAKR operator. Use this to annotate the Kubernetes SA in Helm: iam.gke.io/gcp-service-account"
-  value       = google_service_account.operator_sa.email
+  value       = local.operator_sa_email
 }
 
 output "ksa_annotation_key" {
@@ -10,7 +10,7 @@ output "ksa_annotation_key" {
 
 output "ksa_annotation_value" {
   description = "The annotation value (GCP SA email) for the Kubernetes Service Account."
-  value       = google_service_account.operator_sa.email
+  value       = local.operator_sa_email
 }
 
 output "gke_workload_identity_pool" {
