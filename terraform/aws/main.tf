@@ -17,24 +17,15 @@ data "tls_certificate" "eks_oidc_thumbprint" {
   url = local.eks_oidc_issuer_url
 }
 
-# Get existing OIDC provider for the EKS cluster
-data "aws_iam_openid_connect_provider" "existing_eks_oidc_provider" {
-  url = local.eks_oidc_issuer_url
-}
-
-locals {
-  # Extract the OIDC issuer ID from the URL (part after the last slash)
-  oidc_issuer_id = split("/", local.eks_oidc_issuer_url)[length(split("/", local.eks_oidc_issuer_url)) - 1]
-  
-  # Find existing OIDC provider ARN that matches our EKS cluster's OIDC issuer
-  existing_oidc_provider_arn = try(data.aws_iam_openid_connect_provider.existing_eks_oidc_provider.arn, null)
-  
-  # Determine if we need to create a new OIDC provider
-  should_create_oidc_provider = local.existing_oidc_provider_arn == null
+data "external" "existing_eks_oidc_provider" {
+  program = ["bash", "${path.module}/check_oidc.sh"]
+  query = {
+    url = local.eks_oidc_issuer_url
+  }
 }
 
 resource "aws_iam_openid_connect_provider" "eks_oidc_provider" {
-  count           = local.should_create_oidc_provider ? 1 : 0
+  count           = data.external.existing_eks_oidc_provider.result.arn == "" ? 1 : 0
   client_id_list  = ["sts.amazonaws.com"]
   thumbprint_list = [data.tls_certificate.eks_oidc_thumbprint.certificates[0].sha1_fingerprint]
   url             = local.eks_oidc_issuer_url
@@ -43,7 +34,7 @@ resource "aws_iam_openid_connect_provider" "eks_oidc_provider" {
 }
 
 locals {
-  effective_eks_oidc_provider_arn    = local.should_create_oidc_provider ? aws_iam_openid_connect_provider.eks_oidc_provider[0].arn : local.existing_oidc_provider_arn
+  effective_eks_oidc_provider_arn    = coalesce(aws_iam_openid_connect_provider.eks_oidc_provider[0].arn, data.external.existing_eks_oidc_provider.result.arn)
   oidc_issuer_hostpath_for_condition = replace(local.eks_oidc_issuer_url, "https://", "")
 }
 
@@ -65,12 +56,25 @@ resource "aws_iam_policy" "operator_policy" {
       },
       {
         Effect   = "Allow",
+        Action   = ["eks:DescribeNodegroup"],
+        Resource = "*"
+      },
+      {
+        Effect   = "Allow",
         Action   = ["ec2:TerminateInstances"],
         Resource = "*"
       },
       {
         Effect   = "Allow",
         Action   = ["autoscaling:TerminateInstanceInAutoScalingGroup"],
+        Resource = "*"
+      },
+      {
+        Effect   = "Allow",
+        Action   = [
+          "autoscaling:DescribeAutoScalingGroups",
+          "autoscaling:SetDesiredCapacity"
+        ],
         Resource = "*"
       }
     ]

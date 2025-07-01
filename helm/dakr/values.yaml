@@ -23,6 +23,7 @@ operator:
   endpoint: "https://dakr.devzero.io"
   clusterToken: "REPLACE WITH TOKEN"
   clusterName: "REPLACE WITH CLUSTER NAME" 
+  clusterLocation: "CLUSTER LOCATION HERE"  # usually the cloud region code for where the cluster is running, can also be the zone if the cluster is zonal
   # noCloudCreds: true # If true, operator will not attempt to perform node scaling operations, and will not require cloud credentials
   # tokenFromConfigMap: # If clusterToken is not specified above, operator will read from below ConfigMap value
   #   name: "devzero-zxporter-env-config" # Name of the ConfigMap
