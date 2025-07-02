@@ -26,7 +26,7 @@ on:
         type: boolean
 
 env:
-  AWS_DEFAULT_REGION: us-west-2
+  AWS_DEFAULT_REGION: us-east-1
 
 jobs:
   cleanup-aws-resources:
@@ -43,13 +43,19 @@ jobs:
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: us-west-2
+        aws-region: us-east-1
 
     - name: Install prerequisites
       run: |
         # Install required tools
         sudo apt-get update
-        sudo apt-get install -y jq awscli
+        sudo apt-get install -y jq curl unzip
+        
+        # Install AWS CLI v2
+        curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+        unzip awscliv2.zip
+        sudo ./aws/install
+        aws --version
         
         # Install eksctl
         curl --silent --location "https://github.com/eksctl-io/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
@@ -60,6 +66,7 @@ jobs:
         curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
         chmod +x kubectl
         sudo mv kubectl /usr/local/bin/
+        kubectl version --client
 
     - name: Set cleanup parameters
       id: params
