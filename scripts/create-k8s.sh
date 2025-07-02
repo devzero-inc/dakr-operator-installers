@@ -582,8 +582,24 @@ nodeGroups:
     amiFamily: $AMI_FAMILY
     volumeSize: 20
     volumeType: gp3
+EOF
+
+    # Only add SSH configuration if we're not in CI and SSH keys exist
+    if [[ -z "$GITHUB_ACTIONS" && (-f ~/.ssh/id_rsa.pub || -f ~/.ssh/id_ed25519.pub) ]]; then
+        cat >> "$CLUSTER_CONFIG" << EOF
     ssh:
       allow: true
+EOF
+        print_info "SSH access enabled for nodes"
+    else
+        cat >> "$CLUSTER_CONFIG" << EOF
+    ssh:
+      allow: false
+EOF
+        print_info "SSH access disabled (CI environment or no SSH keys found)"
+    fi
+
+    cat >> "$CLUSTER_CONFIG" << EOF
     labels:
       role: worker
     tags:
