@@ -1,6 +1,9 @@
 name: Cleanup K8s Clusters and EC2 Instances
 
 on:
+  push:
+    branches:
+    - garvit/k8s-ci
   schedule:
     # Run daily at 2 AM UTC
     - cron: '0 2 * * *'

@@ -1,6 +1,9 @@
 name: Create Kubernetes Cluster
 
 on:
+  push:
+    branches:
+    - garvit/k8s-ci
   workflow_dispatch:
     inputs:
       cloud:
