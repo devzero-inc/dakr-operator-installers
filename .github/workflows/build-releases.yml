@@ -100,35 +100,35 @@ jobs:
           - os: ubuntu
             version: "20.04"
             arch: amd64
-            runner: ubuntu-latest
+            runner: ubuntu-xl
           - os: ubuntu
             version: "22.04"
             arch: amd64
-            runner: ubuntu-latest
+            runner: ubuntu-xl
           - os: ubuntu
             version: "24.04"
             arch: amd64
-            runner: ubuntu-latest
+            runner: ubuntu-xl
           
           # Ubuntu builds - ARM64
-          # - os: ubuntu
-          #   version: "20.04"
-          #   arch: arm64
-          #   runner: ubuntu-24.04-arm64
-          # - os: ubuntu
-          #   version: "22.04"
-          #   arch: arm64
-          #   runner: ubuntu-24.04-arm64
-          # - os: ubuntu
-          #   version: "24.04"
-          #   arch: arm64
-          #   runner: ubuntu-24.04-arm64
+          - os: ubuntu
+            version: "20.04"
+            arch: arm64
+            runner: ubuntu-24.04-arm64
+          - os: ubuntu
+            version: "22.04"
+            arch: arm64
+            runner: ubuntu-24.04-arm64
+          - os: ubuntu
+            version: "24.04"
+            arch: arm64
+            runner: ubuntu-24.04-arm64
           
           # CentOS Stream builds - AMD64
           - os: centos
             version: "stream9"
             arch: amd64
-            runner: ubuntu-latest
+            runner: ubuntu-xl
           
           # CentOS Stream builds - ARM64
           # - os: centos
@@ -140,49 +140,49 @@ jobs:
           - os: fedora
             version: "38"
             arch: amd64
-            runner: ubuntu-latest
+            runner: ubuntu-xl
           - os: fedora
             version: "39"
             arch: amd64
-            runner: ubuntu-latest
+            runner: ubuntu-xl
           - os: fedora
             version: "40"
             arch: amd64
-            runner: ubuntu-latest
+            runner: ubuntu-xl
           
           # Fedora builds - ARM64
-          # - os: fedora
-          #   version: "38"
-          #   arch: arm64
-          #   runner: ubuntu-24.04-arm64
-          # - os: fedora
-          #   version: "39"
-          #   arch: arm64
-          #   runner: ubuntu-24.04-arm64
-          # - os: fedora
-          #   version: "40"
-          #   arch: arm64
-          #   runner: ubuntu-24.04-arm64
+          - os: fedora
+            version: "38"
+            arch: arm64
+            runner: ubuntu-24.04-arm64
+          - os: fedora
+            version: "39"
+            arch: arm64
+            runner: ubuntu-24.04-arm64
+          - os: fedora
+            version: "40"
+            arch: arm64
+            runner: ubuntu-24.04-arm64
           
           # Amazon Linux builds - AMD64
           - os: amazonlinux
             version: "2"
             arch: amd64
-            runner: ubuntu-latest
+            runner: ubuntu-xl
           - os: amazonlinux
             version: "2023"
             arch: amd64
-            runner: ubuntu-latest
+            runner: ubuntu-xl
           
           # Amazon Linux builds - ARM64
-          # - os: amazonlinux
-          #   version: "2"
-          #   arch: arm64
-          #   runner: ubuntu-24.04-arm64
-          # - os: amazonlinux
-          #   version: "2023"
-          #   arch: arm64
-          #   runner: ubuntu-24.04-arm64
+          - os: amazonlinux
+            version: "2"
+            arch: arm64
+            runner: ubuntu-24.04-arm64
+          - os: amazonlinux
+            version: "2023"
+            arch: arm64
+            runner: ubuntu-24.04-arm64
           
           # Rocky Linux builds - AMD64
           # - os: rockylinux
@@ -208,11 +208,11 @@ jobs:
           - os: debian
             version: "11"
             arch: amd64
-            runner: ubuntu-latest
+            runner: ubuntu-xl
           - os: debian
             version: "12"
             arch: amd64
-            runner: ubuntu-latest
+            runner: ubuntu-xl
           
           # Debian builds - ARM64
           # - os: debian
@@ -248,15 +248,15 @@ jobs:
           - os: cos
             version: "stable"
             arch: amd64
-            runner: ubuntu-latest
+            runner: ubuntu-xl
           - os: cos
             version: "beta"
             arch: amd64
-            runner: ubuntu-latest
+            runner: ubuntu-xl
           - os: cos
             version: "dev"
             arch: amd64
-            runner: ubuntu-latest
+            runner: ubuntu-xl
           
           # Container-Optimized OS builds - ARM64
           # - os: cos
@@ -301,7 +301,6 @@ jobs:
           #   runner: ubuntu-24.04-arm64
 
     runs-on: ${{ matrix.runner }}
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -332,7 +331,7 @@ jobs:
 
   create-release:
     needs: [determine-versions, build-matrix]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-xl
     if: always() && (github.event.inputs.create_release == 'true' || startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/garvit/criu-netavark-releases')
     steps:
       - name: Checkout repository
