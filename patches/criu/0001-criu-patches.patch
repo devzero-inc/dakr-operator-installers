@@ -1,0 +1,57 @@
+diff --git a/compel/arch/aarch64/plugins/include/asm/syscall-types.h b/compel/arch/aarch64/plugins/include/asm/syscall-types.h
+index 45fd57a..79f06ea 100644
+--- a/compel/arch/aarch64/plugins/include/asm/syscall-types.h
++++ b/compel/arch/aarch64/plugins/include/asm/syscall-types.h
+@@ -25,4 +25,6 @@ typedef struct {
+        k_rtsigset_t rt_sa_mask;
+ } rt_sigaction_t;
+ 
++#define loff_t off_t
++
+ #endif /* COMPEL_ARCH_SYSCALL_TYPES_H__ */
+diff --git a/compel/arch/aarch64/src/lib/include/uapi/asm/sigframe.h b/compel/arch/aarch64/src/lib/include/uapi/asm/sigframe.h
+index 9152024..e84f451 100644
+--- a/compel/arch/aarch64/src/lib/include/uapi/asm/sigframe.h
++++ b/compel/arch/aarch64/src/lib/include/uapi/asm/sigframe.h
+@@ -1,7 +1,6 @@
+ #ifndef UAPI_COMPEL_ASM_SIGFRAME_H__
+ #define UAPI_COMPEL_ASM_SIGFRAME_H__
+ 
+-#include <asm/sigcontext.h>
+ #include <sys/ucontext.h>
+ 
+ #include <stdint.h>
+diff --git a/criu/Makefile b/criu/Makefile
+index bafdd98..a22b1d8 100644
+--- a/criu/Makefile
++++ b/criu/Makefile
+@@ -157,4 +157,4 @@ uninstall:
+        $(Q) $(RM) $(addprefix $(DESTDIR)$(LIBEXECDIR)/criu/scripts/,systemd-autofs-restart.sh)
+ .PHONY: uninstall
+ 
+-all-y += check-packages $(obj)/criu
++all-y += $(obj)/criu
+diff --git a/criu/arch/aarch64/include/asm/restorer.h b/criu/arch/aarch64/include/asm/restorer.h
+index 64a9c24..0359e78 100644
+--- a/criu/arch/aarch64/include/asm/restorer.h
++++ b/criu/arch/aarch64/include/asm/restorer.h
+@@ -1,7 +1,6 @@
+ #ifndef __CR_ASM_RESTORER_H__
+ #define __CR_ASM_RESTORER_H__
+ 
+-#include <asm/sigcontext.h>
+ #include <sys/ucontext.h>
+ 
+ #include "asm/types.h"
+diff --git a/criu/include/asm-generic/int.h b/criu/include/asm-generic/int.h
+index 5bf4847..2202f1b 100644
+--- a/criu/include/asm-generic/int.h
++++ b/criu/include/asm-generic/int.h
+@@ -1,6 +1,7 @@
+ #ifndef __CR_INT_H__
+ #define __CR_INT_H__
+ 
++#include <linux/types.h>
+ #include <stdint.h>
+ 
+ typedef uint64_t u64;

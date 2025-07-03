@@ -96,212 +96,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Ubuntu builds - AMD64
-          - os: ubuntu
-            version: "20.04"
-            arch: amd64
-            runner: ubuntu-latest
-          - os: ubuntu
-            version: "22.04"
-            arch: amd64
-            runner: ubuntu-latest
-          - os: ubuntu
-            version: "24.04"
-            arch: amd64
-            runner: ubuntu-latest
-          
-          # Ubuntu builds - ARM64
-          # - os: ubuntu
-          #   version: "20.04"
-          #   arch: arm64
-          #   runner: ubuntu-24.04-arm64
-          # - os: ubuntu
-          #   version: "22.04"
-          #   arch: arm64
-          #   runner: ubuntu-24.04-arm64
-          # - os: ubuntu
-          #   version: "24.04"
-          #   arch: arm64
-          #   runner: ubuntu-24.04-arm64
-          
-          # CentOS Stream builds - AMD64
-          - os: centos
-            version: "stream9"
-            arch: amd64
-            runner: ubuntu-latest
-          
-          # CentOS Stream builds - ARM64
-          # - os: centos
-          #   version: "stream9"
-          #   arch: arm64
-          #   runner: ubuntu-24.04-arm64
-          
-          # Fedora builds - AMD64
-          - os: fedora
-            version: "38"
-            arch: amd64
-            runner: ubuntu-latest
-          - os: fedora
-            version: "39"
-            arch: amd64
-            runner: ubuntu-latest
-          - os: fedora
-            version: "40"
-            arch: amd64
-            runner: ubuntu-latest
-          
-          # Fedora builds - ARM64
-          # - os: fedora
-          #   version: "38"
-          #   arch: arm64
-          #   runner: ubuntu-24.04-arm64
-          # - os: fedora
-          #   version: "39"
-          #   arch: arm64
-          #   runner: ubuntu-24.04-arm64
-          # - os: fedora
-          #   version: "40"
-          #   arch: arm64
-          #   runner: ubuntu-24.04-arm64
-          
-          # Amazon Linux builds - AMD64
-          - os: amazonlinux
-            version: "2"
-            arch: amd64
-            runner: ubuntu-latest
-          - os: amazonlinux
-            version: "2023"
-            arch: amd64
-            runner: ubuntu-latest
-          
-          # Amazon Linux builds - ARM64
-          # - os: amazonlinux
-          #   version: "2"
-          #   arch: arm64
-          #   runner: ubuntu-24.04-arm64
-          # - os: amazonlinux
-          #   version: "2023"
-          #   arch: arm64
-          #   runner: ubuntu-24.04-arm64
-          
-          # Rocky Linux builds - AMD64
-          # - os: rockylinux
-          #   version: "8"
-          #   arch: amd64
-          #   runner: ubuntu-latest
-          # - os: rockylinux
-          #   version: "9"
-          #   arch: amd64
-          #   runner: ubuntu-latest
-          
-          # Rocky Linux builds - ARM64
-          # - os: rockylinux
-          #   version: "8"
-          #   arch: arm64
-          #   runner: ubuntu-24.04-arm64
-          # - os: rockylinux
-          #   version: "9"
-          #   arch: arm64
-          #   runner: ubuntu-24.04-arm64
-          
-          # Debian builds - AMD64
-          - os: debian
-            version: "11"
-            arch: amd64
-            runner: ubuntu-latest
-          - os: debian
-            version: "12"
-            arch: amd64
-            runner: ubuntu-latest
-          
-          # Debian builds - ARM64
-          # - os: debian
-          #   version: "11"
-          #   arch: arm64
-          #   runner: ubuntu-24.04-arm64
-          # - os: debian
-          #   version: "12"
-          #   arch: arm64
-          #   runner: ubuntu-24.04-arm64
-          
-          # Alpine builds - AMD64
-          # - os: alpine
-          #   version: "3.18"
-          #   arch: amd64
-          #   runner: ubuntu-latest
-          # - os: alpine
-          #   version: "3.19"
-          #   arch: amd64
-          #   runner: ubuntu-latest
-          
-          # Alpine builds - ARM64
-          # - os: alpine
-          #   version: "3.18"
-          #   arch: arm64
-          #   runner: ubuntu-24.04-arm64
-          # - os: alpine
-          #   version: "3.19"
-          #   arch: arm64
-          #   runner: ubuntu-24.04-arm64
-          
-          # Container-Optimized OS builds - AMD64
-          - os: cos
-            version: "stable"
-            arch: amd64
-            runner: ubuntu-latest
-          - os: cos
-            version: "beta"
-            arch: amd64
-            runner: ubuntu-latest
-          - os: cos
-            version: "dev"
-            arch: amd64
-            runner: ubuntu-latest
-          
-          # Container-Optimized OS builds - ARM64
-          # - os: cos
-          #   version: "stable"
-          #   arch: arm64
-          #   runner: ubuntu-24.04-arm64
-          # - os: cos
-          #   version: "beta"
-          #   arch: arm64
-          #   runner: ubuntu-24.04-arm64
-          # - os: cos
-          #   version: "dev"
-          #   arch: arm64
-          #   runner: ubuntu-24.04-arm64
-          
-          # RHEL builds - AMD64
-          # - os: rhel
-          #   version: "7"
-          #   arch: amd64
-          #   runner: ubuntu-latest
-          # - os: rhel
-          #   version: "8"
-          #   arch: amd64
-          #   runner: ubuntu-latest
-          # - os: rhel
-          #   version: "9"
-          #   arch: amd64
-          #   runner: ubuntu-latest
-          
-          # RHEL builds - ARM64
-          # - os: rhel
-          #   version: "7"
-          #   arch: arm64
-          #   runner: ubuntu-24.04-arm64
-          # - os: rhel
-          #   version: "8"
-          #   arch: arm64
-          #   runner: ubuntu-24.04-arm64
-          # - os: rhel
-          #   version: "9"
-          #   arch: arm64
-          #   runner: ubuntu-24.04-arm64
+          - arch: amd64
+            runner: ubuntu-xl
+          - arch: arm64
+            runner: ubuntu-24.04-arm64
 
     runs-on: ${{ matrix.runner }}
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -316,8 +116,6 @@ jobs:
           echo "Target architecture: ${{ matrix.arch }}"
           
           ./scripts/build.sh \
-            --os "${{ matrix.os }}" \
-            --version "${{ matrix.version }}" \
             --arch "${{ matrix.arch }}" \
             --criu-version "${{ needs.determine-versions.outputs.criu_version }}" \
             --netavark-version "${{ needs.determine-versions.outputs.netavark_version }}"
@@ -325,14 +123,14 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: binaries-${{ matrix.os }}-${{ matrix.version }}-${{ matrix.arch }}
+          name: binaries-${{ matrix.arch }}
           path: |
             dist/
           retention-days: 30
 
   create-release:
     needs: [determine-versions, build-matrix]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-xl
     if: always() && (github.event.inputs.create_release == 'true' || startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/garvit/criu-netavark-releases')
     steps:
       - name: Checkout repository
@@ -423,14 +221,7 @@ jobs:
             
             ### Supported Platforms
             Available binaries (check release assets for actual successful builds):
-            - Ubuntu 20.04, 22.04, 24.04 (amd64, arm64)
-            - CentOS Stream 9 (amd64, arm64)
-            - Fedora 38, 39, 40 (amd64, arm64)
-            - Amazon Linux 2, 2023 (amd64, arm64)
-            - Rocky Linux 8, 9 (amd64, arm64)
-            - Debian 11, 12 (amd64, arm64)
-            - Alpine 3.18, 3.19 (amd64, arm64)
-            - Red Hat Enterprise Linux 7, 8, 9 (amd64, arm64)
+            - Any linux distribution (amd64, arm64)
             
             ### Installation
             1. Download the appropriate archive for your platform

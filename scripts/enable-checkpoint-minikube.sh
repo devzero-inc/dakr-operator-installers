@@ -6,9 +6,11 @@
 set -e
 
 echo "Configuring containerd in Minikube for checkpointing..."
+SCRIPT=$(mktemp -t dakr-enable-checkpoint)
+trap "rm $SCRIPT" EXIT
 
 # Connect to Minikube
-minikube ssh << 'EOF'
+cat <<'EOF' > "$SCRIPT"
   # Make a backup of the containerd config
   sudo cp /etc/containerd/config.toml /etc/containerd/config.toml.backup
 
@@ -39,11 +41,10 @@ minikube ssh << 'EOF'
   # Restart containerd
   echo "Restarting containerd..."
   sudo systemctl restart containerd
-
-  # Verify the configuration
-  echo "Checking containerd configuration..."
-  sudo crictl info | grep -i checkpoint || echo "Could not find checkpoint in crictl info"
 EOF
+
+minikube cp "$SCRIPT" /usr/local/bin/enable-checkpoint-minikube.sh 
+minikube ssh "sudo chmod +x /usr/local/bin/enable-checkpoint-minikube.sh && sudo /usr/local/bin/enable-checkpoint-minikube.sh"
 
 echo "Minikube containerd configuration complete!"
 echo "Now apply your DAKR snapshot setup DaemonSet to install CRIU and Netavark:"

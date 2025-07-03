@@ -3,8 +3,6 @@
 set -euo pipefail
 
 # Default values
-OS=""
-VERSION=""
 ARCH=""
 CRIU_VERSION="v4.1"
 NETAVARK_VERSION="v1.15.2"
@@ -17,11 +15,9 @@ show_help() {
     cat << EOF
 Usage: $0 [OPTIONS]
 
-Build CRIU and Netavark for specified OS/version/architecture combination.
+Build CRIU and Netavark for specified architecture combination.
 
 OPTIONS:
-    --os OS                 Target OS (ubuntu, centos, fedora, amazonlinux, rockylinux, debian, alpine, cos, rhel)
-    --version VERSION       OS version (e.g., 20.04, 22.04, 7, 8, 9, 11, 12, 3.18, 3.19)
     --arch ARCH            Target architecture (amd64, arm64)
     --criu-version VER     CRIU version to build (default: v4.1)
     --netavark-version VER Netavark version to build (default: v1.15.2)
@@ -30,9 +26,9 @@ OPTIONS:
     --help                 Show this help message
 
 EXAMPLES:
-    $0 --os ubuntu --version 22.04 --arch amd64
-    $0 --os alpine --version 3.19 --arch arm64 --cross-build
-    $0 --os ubuntu --version 20.04 --arch amd64 --criu-version v4.1
+    $0 --arch amd64
+    $0 --arch arm64 --cross-build
+    $0 --arch amd64 --criu-version v4.1
 
 NOTE:
     Cross-platform builds (--cross-build) require Docker buildx and QEMU emulation.
@@ -43,14 +39,6 @@ EOF
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
-        --os)
-            OS="$2"
-            shift 2
-            ;;
-        --version)
-            VERSION="$2"
-            shift 2
-            ;;
         --arch)
             ARCH="$2"
             shift 2
@@ -84,22 +72,12 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Validate required parameters
-if [[ -z "$OS" || -z "$VERSION" || -z "$ARCH" ]]; then
-    echo "Error: --os, --version, and --arch are required"
+if [[ -z "$ARCH" ]]; then
+    echo "Error: --arch is required"
     show_help
     exit 1
 fi
 
-# Validate OS
-case "$OS" in
-    ubuntu|centos|fedora|amazonlinux|rockylinux|debian|alpine|cos|rhel)
-        ;;
-    *)
-        echo "Error: Unsupported OS '$OS'"
-        echo "Supported: ubuntu, centos, fedora, amazonlinux, rockylinux, debian, alpine, cos, rhel"
-        exit 1
-        ;;
-esac
 
 # Validate architecture
 case "$ARCH" in
@@ -121,7 +99,7 @@ case "$HOST_ARCH" in
     x86_64)
         HOST_DOCKER_ARCH="amd64"
         ;;
-    aarch64)
+    aarch64|arm64)
         HOST_DOCKER_ARCH="arm64"
         ;;
     *)
@@ -173,64 +151,30 @@ fi
 mkdir -p "$OUTPUT_PATH"
 
 echo "=== Building CRIU and Netavark ==="
-echo "OS: $OS"
-echo "Version: $VERSION"
 echo "Architecture: $ARCH"
 echo "CRIU Version: $CRIU_VERSION"
 echo "Netavark Version: $NETAVARK_VERSION"
 echo "Output Directory: $OUTPUT_PATH"
 echo "==============================="
 
-# Determine the appropriate Dockerfile
-DOCKERFILE_NAME=""
-case "$OS" in
-    ubuntu)
-        DOCKERFILE_NAME="Dockerfile.ubuntu"
-        ;;
-    centos)
-        DOCKERFILE_NAME="Dockerfile.centos"
-        ;;
-    fedora)
-        DOCKERFILE_NAME="Dockerfile.fedora"
-        ;;
-    amazonlinux)
-        DOCKERFILE_NAME="Dockerfile.amazonlinux"
-        ;;
-    rockylinux)
-        DOCKERFILE_NAME="Dockerfile.rockylinux"
-        ;;
-    debian)
-        DOCKERFILE_NAME="Dockerfile.debian"
-        ;;
-    alpine)
-        DOCKERFILE_NAME="Dockerfile.alpine"
-        ;;
-    cos)
-        DOCKERFILE_NAME="Dockerfile.cos"
-        ;;
-    rhel)
-        DOCKERFILE_NAME="Dockerfile.rhel"
-        ;;
-esac
-
 # Build using Docker
-DOCKERFILE_PATH="$BUILD_DIR/$DOCKERFILE_NAME"
+DOCKERFILE_PATH="$BUILD_DIR/Dockerfile"
 if [[ ! -f "$DOCKERFILE_PATH" ]]; then
     echo "Error: Dockerfile not found: $DOCKERFILE_PATH"
     exit 1
 fi
 
 # Create a unique build context directory
-BUILD_CONTEXT="$BUILD_DIR/context-$OS-$VERSION-$ARCH"
+BUILD_CONTEXT="$BUILD_DIR/context-$ARCH"
 mkdir -p "$BUILD_CONTEXT"
 
 # Copy build files to context
 cp "$DOCKERFILE_PATH" "$BUILD_CONTEXT/"
 cp "$SCRIPT_DIR/build.sh" "$BUILD_CONTEXT/"
-
+cp -r "$PROJECT_ROOT/patches" "$BUILD_CONTEXT/"
 
 # Build the container using appropriate method
-IMAGE_TAG="dakr-builder:$OS-$VERSION-$ARCH"
+IMAGE_TAG="dakr-builder:$ARCH"
 
 echo "Building Docker image: $IMAGE_TAG"
 
@@ -240,24 +184,22 @@ if [[ "$IS_CROSS_BUILD" == "true" ]]; then
     docker buildx build \
         --builder multiplatform \
         --platform "linux/$TARGET_DOCKER_ARCH" \
-        --build-arg "OS_VERSION=$VERSION" \
         --build-arg "CRIU_VERSION=$CRIU_VERSION" \
         --build-arg "NETAVARK_VERSION=$NETAVARK_VERSION" \
         --build-arg "TARGET_ARCH=$ARCH" \
         --load \
         -t "$IMAGE_TAG" \
-        -f "$BUILD_CONTEXT/$DOCKERFILE_NAME" \
+        -f "$BUILD_CONTEXT/Dockerfile" \
         "$BUILD_CONTEXT"
 else
     echo "Using native Docker build..."
     # Use regular docker build for native builds
     docker build \
-        --build-arg "OS_VERSION=$VERSION" \
         --build-arg "CRIU_VERSION=$CRIU_VERSION" \
         --build-arg "NETAVARK_VERSION=$NETAVARK_VERSION" \
         --build-arg "TARGET_ARCH=$ARCH" \
         -t "$IMAGE_TAG" \
-        -f "$BUILD_CONTEXT/$DOCKERFILE_NAME" \
+        -f "$BUILD_CONTEXT/Dockerfile" \
         "$BUILD_CONTEXT"
 fi
 
@@ -265,7 +207,7 @@ fi
 CONTAINER_ID=$(docker create "$IMAGE_TAG")
 
 # Create platform-specific output directory
-PLATFORM_OUTPUT="$OUTPUT_PATH/$OS-$VERSION-$ARCH"
+PLATFORM_OUTPUT="$OUTPUT_PATH/$ARCH"
 mkdir -p "$PLATFORM_OUTPUT"
 
 echo "Extracting binaries to: $PLATFORM_OUTPUT"
@@ -295,8 +237,6 @@ rm -rf "$BUILD_CONTEXT"
 # Create metadata file
 cat > "$PLATFORM_OUTPUT/metadata.json" << EOF
 {
-    "os": "$OS",
-    "version": "$VERSION",
     "architecture": "$ARCH",
     "criu_version": "$CRIU_VERSION",
     "netavark_version": "$NETAVARK_VERSION",
