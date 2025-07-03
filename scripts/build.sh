@@ -293,8 +293,8 @@ fi
 
 # Create archive
 cd "$OUTPUT_PATH"
-ARCHIVE_NAME="dakr-snapshot-tools-$OS-$VERSION-$ARCH.tar.gz"
-tar -czf "$ARCHIVE_NAME" -C "$OS-$VERSION-$ARCH" .
+ARCHIVE_NAME="dakr-snapshot-tools-$ARCH.tar.gz"
+tar -czf "$ARCHIVE_NAME" -C "$ARCH" .
 
 echo "=== Build Complete ==="
 echo "Archive: $OUTPUT_PATH/$ARCHIVE_NAME"

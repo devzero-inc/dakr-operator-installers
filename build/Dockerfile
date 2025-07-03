@@ -147,7 +147,7 @@ RUN mkdir -p criu && cd criu && \
     export PACKAGES_OK=y && \
     # Use optimized make build with all package check bypasses
     echo "Starting CRIU build..." && \
-    make -j$(nproc) WERROR=0 V=1 COMPAT=n CONFIG_COMPAT=n NO_GNUTLS=1 criu && \
+    make -j$(nproc) WERROR=0 V=1 NO_GNUTLS=1 criu && \
     # Install CRIU binary manually if needed
     if [ -f "criu/criu" ]; then \
         mkdir -p /usr/local/bin && \
