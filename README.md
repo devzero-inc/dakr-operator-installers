@@ -2,7 +2,7 @@
 
 # DAKR Operator setup
 
-This guide outlines the steps to configure the necessary cloud provider IAM permissions for the DAKR operator to run on AWS EKS or GCP GKE and install the dakr operator.
+This guide outlines the steps to configure the necessary cloud provider IAM permissions for the DAKR operator to run on AWS EKS or GCP GKE or Azure AKS and install the dakr operator.
 
 ## Prerequisites
 
@@ -14,7 +14,7 @@ This guide outlines the steps to configure the necessary cloud provider IAM perm
 ## Setup Steps
 
 The process involves two main parts:
-1.  **Configure Cloud IAM (Terraform):** Run the Terraform module for your chosen cloud provider (AWS or GCP) to set up IAM roles/service accounts and permissions.
+1.  **Configure Cloud IAM (Terraform):** Run the Terraform module for your chosen cloud provider (AWS, GCP, or Azure) to set up IAM roles/service accounts and permissions.
 2.  **Deploy DAKR Operator (Helm):** Update `helm/dakr/values.yaml` with the Terraform outputs and deploy the operator.
 
 ---
@@ -72,7 +72,7 @@ gcloud container node-pools update NODEPOOL_NAME \
     --location=LOCATION \
     --workload-metadata=GKE_METADATA
 ```
-This ensures pods on this node pool can use Workload Identity. Which is needed for the Dakr operator to authenticate to GCP APIs. Repeat for all relevant node pools. This operation may cause nodes to be recreated!
+This ensures pods on this node pool can use Workload Identity. This is needed for the Dakr operator to authenticate to GCP APIs. Repeat for all relevant node pools. This operation may cause nodes to be recreated!
 
 **1. Configure GCP IAM (Terraform)**
 
@@ -104,6 +104,47 @@ d.  **Note Terraform Outputs for Helm:**
   *   `ksa_annotation_key`: The annotation key (e.g., `iam.gke.io/gcp-service-account`).
   *   `gcp_service_account_email`: The annotation value (the email of the created Google Cloud Service Account).
 
+#### Option C: Azure AKS
+
+**0. Enable Workload Identity on AKS Cluster (Manual Step)**
+
+Before running Terraform for Azure, you must enable Workload Identity and the OIDC Issuer on your AKS cluster. Use the following `az` command, replacing `<cluster-name>` and `<resource-group>` with your specific values:
+
+```bash
+az aks update --name <cluster-name> --resource-group <resource-group> --enable-oidc-issuer --enable-workload-identity
+```
+
+This step is crucial for allowing Kubernetes Service Accounts to be federated with Azure AD identities. This is a non-disruptive operation and will not cause your nodes to restart.
+
+**1. Configure Azure AD Identity (Terraform)**
+
+The Terraform configuration for Azure is in `terraform/azure/`.
+
+a.  **Navigate to the Azure Terraform directory:**
+
+    cd terraform/azure
+
+b.  **Initialize Terraform:**
+
+    terraform init
+
+c.  **Apply Terraform changes:**
+    Replace placeholders with your Azure-specific values.
+
+    terraform apply \
+      -var="subscription_id=YOUR_AZURE_SUBSCRIPTION_ID" \
+      -var="azure_location=YOUR_AZURE_REGION" \
+      -var="aks_cluster_name=YOUR_AKS_CLUSTER_NAME" \
+      -var="aks_cluster_resource_group_name=YOUR_AKS_CLUSTER_RG_NAME" \
+      -var="operator_namespace=YOUR_OPERATOR_NAMESPACE"
+
+  *   The `operator_service_account_name` defaults to `dakr-operator-sa`.
+
+d.  **Note Terraform Outputs for Helm:**
+    After a successful apply, Terraform will output:
+  *   `ksa_annotation_key_client_id`: The annotation key for the client ID (`azure.workload.identity/client-id`).
+  *   `operator_identity_client_id`: The Client ID of the created User-Assigned Managed Identity.
+
 ---
 
 ### 2. Deploy DAKR Operator (Helm)
@@ -112,7 +153,7 @@ After completing the Terraform setup for your chosen cloud provider:
 
 a.  **Update Helm Values:**
     Edit `helm/dakr/values.yaml`. Locate the `operator.serviceAccount.annotations` section.
-    Replace the placeholder key and value with the specific outputs noted from your Terraform apply (AWS or GCP).
+    Replace the placeholder key and value with the specific outputs noted from your Terraform apply (AWS or GCP or Azure).
 
   **Example structure in `values.yaml`:**
 
@@ -130,6 +171,8 @@ a.  **Update Helm Values:**
         #   "eks.amazonaws.com/role-arn": "ARN_FROM_TERRAFORM_OUTPUT"
         # For GCP, it would be:
         #   "iam.gke.io/gcp-service-account": "GSA_EMAIL_FROM_TERRAFORM_OUTPUT"
+        # For Azure, it would be:
+        #   "azure.workload.identity/client-id": "CLIENT_ID_FROM_TERRAFORM_OUTPUT"
         annotations:
           "placeholder.terraform.output/annotation-key": "placeholder-terraform-output-annotation-value"
     # ...
@@ -150,9 +193,9 @@ Your DAKR operator should now be deployed with the necessary cloud IAM permissio
 
 ---
 
-## Debugging: Manual Node Deletion API
+## Debugging: Manual Node Operations API
 
-The DAKR operator exposes an HTTP endpoint for manually triggering node deletion for debugging purposes. This endpoint is served on the port defined by `operator.debugPort` in `helm/dakr/values.yaml` (defaults to `8082`).
+The DAKR operator exposes HTTP endpoints for manually triggering node operations for debugging purposes. These endpoints are served on the port defined by `operator.debugPort` in `helm/dakr/values.yaml` (defaults to `8082`).
 
 **Steps:**
 
@@ -161,21 +204,33 @@ The DAKR operator exposes an HTTP endpoint for manually triggering node deletion
     ```bash
     kubectl port-forward <operator-pod-name> -n <operator-namespace> 8082:8082
     ```
-    (If you configured a different `operator.debugPort` in your Helm values, use that port number in the command above and in the `curl` command below.)
+    (If you configured a different `operator.debugPort` in your Helm values, use that port number in the command above and in the `curl` commands below.)
 
-2.  **Send the POST request:**
-    In a new terminal, use `curl` to send a POST request to the `/delete-node/{nodeName}` endpoint. Replace `{nodeName}` with the actual name of the Kubernetes node you want to delete.
+2.  **Send POST requests:**
+    In a new terminal, use `curl` to send POST requests to the available endpoints:
+
+    **Delete a node:**
+    Replace `{nodeName}` with the actual name of the Kubernetes node you want to delete. The `--max-time 0` flag prevents the command from timing out during long operations.
     ```bash
-    curl -X POST http://localhost:8082/delete-node/{nodeName}
+    curl -X POST --max-time 0 http://localhost:8082/delete-node/{nodeName}
     ```
+
     For example, to delete a node named `ip-10-0-1-123.ec2.internal` (AWS) or `gke-my-cluster-default-pool-xxxx` (GCP):
+    
     ```bash
-    curl -X POST http://localhost:8082/delete-node/your-node-name-here
+    curl -X POST --max-time 0 http://localhost:8082/delete-node/your-node-name-here
     ```
     A successful request will return an HTTP 200 status and a message indicating that the node deletion was initiated. Check the operator logs for more details on the deletion process.
 
-**Caution:** This endpoint is intended for debugging and manual intervention. Exercise caution when using it, as it directly triggers node deletion.
+    **Add nodes to a node group:**
+    Replace `{nodeGroupName}` with the node group name and `{desiredCount}` with the target number of nodes.
+    ```bash
+    curl -X POST --max-time 0 http://localhost:8082/add-nodes/{nodeGroupName}/{desiredCount}
+    ```
 
+    A successful request will return an HTTP 200 status and a message indicating that the operation was initiated. Check the operator logs for more details on the process.
+
+**Caution:** These endpoints are intended for debugging and manual intervention. Exercise caution when using them, as they directly trigger node operations.
 ---
 
 ## DAKR Snapshot Tools
