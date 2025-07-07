@@ -19,6 +19,9 @@ spec:
       annotations:
         kubectl.kubernetes.io/default-container: manager
       labels:
+        {{- if eq .Values.cloud "azure" }}
+        azure.workload.identity/use: "true"
+        {{- end }}
         {{- include "dakr.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: {{ include "dakr.fullname" . }}-operator
         control-plane: {{ include "dakr.fullname" . }}-operator
@@ -57,7 +60,6 @@ spec:
           {{- if .Values.operator.noCloudCreds }}
           - --no-cloud-creds
           {{- end }}
-        {{- if .Values.operator.tokenFromConfigMap }}
         env:
           - name: TOKEN_CONFIGMAP_NAME
             value: {{ .Values.operator.tokenFromConfigMap.name | quote }}
@@ -65,7 +67,12 @@ spec:
             value: {{ .Values.operator.tokenFromConfigMap.namespace | quote }}
           - name: TOKEN_CONFIGMAP_KEY
             value: {{ .Values.operator.tokenFromConfigMap.key | quote }}
-        {{- end }}
+          - name: CLUSTER_NAME_CONFIGMAP_NAME
+            value: {{ .Values.operator.nameFromConfigMap.name | quote }}
+          - name: CLUSTER_NAME_CONFIGMAP_NAMESPACE
+            value: {{ .Values.operator.nameFromConfigMap.namespace | quote }}
+          - name: CLUSTER_NAME_CONFIGMAP_KEY
+            value: {{ .Values.operator.nameFromConfigMap.key | quote }}
         image: "{{ .Values.image.repository }}/{{ .Values.operator.image }}:{{ .Values.image.tag }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         name: manager
