@@ -1,6 +1,10 @@
 nameOverride: ""
 fullnameOverride: ""
 
+# The cloud provider where the operator is being deployed.
+# Must be one of: "aws", "gcp", "azure", or "" (for no cloud provider).
+cloud: ""
+
 
 image:
   repository: devzeroinc
@@ -21,14 +25,20 @@ operator:
       cpu: 10m
       memory: 64Mi
   endpoint: "https://dakr.devzero.io"
-  clusterToken: "REPLACE WITH TOKEN"
-  clusterName: "REPLACE WITH CLUSTER NAME" 
+  clusterToken: "REPLACE WITH TOKEN" # If this is empty, the operator will attempt to read from the ConfigMap below.
+                   # If set to a non-empty string, this value will be used directly.
+  clusterName: "REPLACE WITH CLUSTER NAME" # If this is empty, the operator will attempt to read from the ConfigMap below.
+                  # If set to a non-empty string, this value will be used directly.
   clusterLocation: "CLUSTER LOCATION HERE"  # usually the cloud region code for where the cluster is running, can also be the zone if the cluster is zonal
   # noCloudCreds: true # If true, operator will not attempt to perform node scaling operations, and will not require cloud credentials
   # tokenFromConfigMap: # If clusterToken is not specified above, operator will read from below ConfigMap value
   #   name: "devzero-zxporter-env-config" # Name of the ConfigMap
-  #   namespace: "devzero-zxporter"      # Namespace of the ConfigMap
-  #   key: "CLUSTER_TOKEN"               # Key in the ConfigMap's data to get the token
+  #   namespace: "devzero-zxporter"       # Namespace of the ConfigMap
+  #   key: "CLUSTER_TOKEN"                # Key in the ConfigMap's data to get the token
+  # nameFromConfigMap: # If clusterName is not specified above, operator will read from below ConfigMap value
+  #   name: "devzero-zxporter-env-config" # Name of the ConfigMap
+  #   namespace: "devzero-zxporter"       # Namespace of the ConfigMap
+  #   key: "KUBE_CONTEXT_NAME"            # Key in the ConfigMap's data to get the cluster name from
   port: 9443
   debugPort: 8082
   serviceAccount:
@@ -45,15 +55,21 @@ operator:
     # 2. Set the annotation key to the output 'ksa_annotation_key' (iam.gke.io/gcp-service-account).
     # 3. Set the annotation value to the output 'gcp_service_account_email'.
     #
-    # eks.amazonaws.com/role-arn: "arn:aws:iam::147899144864:role/kevin-test-eks-dakr-operator-sa-role"
+    # For Azure AKS with Workload Identity:
+    # 1. Run the terraform module in terraform/azure/.
+    # 2. Set the annotation key to the output 'ksa_annotation_key_client_id' (azure.workload.identity/client-id).
+    # 3. Set the annotation value to the output 'operator_identity_client_id'.
     #
-    # Example for AWS:
+    # --- Examples ---
+    # AWS:
     #   "eks.amazonaws.com/role-arn": "arn:aws:iam::YOUR_ACCOUNT_ID:role/YOUR_EKS_CLUSTER_NAME-dakr-operator-sa-role"
-    # Example for GCP:
+    # GCP:
     #   "iam.gke.io/gcp-service-account": "your-gcp-sa-email@your-gcp-project-id.iam.gserviceaccount.com"
+    # Azure:
+    #   "azure.workload.identity/client-id": "YOUR_USER_ASSIGNED_IDENTITY_CLIENT_ID"
     annotations:
       # Replace with the appropriate key-value pair from your Terraform output
-      # (see instructions above)
+      # (see instructions above). 
       "REPLACE WITH ANNOTATION KEY": "REPLACE WTIH ANNOTATION VALUE"
 
 webhook:
