@@ -44,9 +44,9 @@ spec:
           value: "DAKR Snapshot Tools - criu-"
         volumeMounts:
         - name: host-bin
-          mountPath: /host/usr/local/bin
+          mountPath: /host/usr/bin
         - name: host-lib
-          mountPath: /host/usr/local/lib
+          mountPath: /host/usr/lib
         - name: host-etc
           mountPath: /host/etc
         - name: host-proc
@@ -85,7 +85,7 @@ spec:
             echo "🔍 Checking for CRIU on host system..."
             criu_path=""
             
-            for path in /usr/local/bin/criu /usr/bin/criu /bin/criu /sbin/criu; do
+            for path in /usr/bin/criu /bin/criu /sbin/criu; do
               if [ -x "/host$path" ]; then
                 echo "Found CRIU at host path: $path"
                 criu_path="$path"
@@ -120,7 +120,7 @@ spec:
             echo "🔍 Checking for Netavark on host system..."
             netavark_path=""
             
-            for path in /usr/local/bin/netavark /usr/bin/netavark /bin/netavark /sbin/netavark; do
+            for path in /usr/bin/netavark /bin/netavark /sbin/netavark; do
               if [ -x "/host$path" ]; then
                 echo "Found Netavark at host path: $path"
                 netavark_path="$path"
@@ -286,8 +286,8 @@ spec:
             elif [ -f criu ]; then
               echo "Installing CRIU..."
               chmod +x criu
-              cp criu /host/usr/local/bin/criu
-              chmod +x /host/usr/local/bin/criu
+              cp criu /host/usr/bin/criu
+              chmod +x /host/usr/bin/criu
               echo "CRIU installed successfully"
               criu_installed=true
             else
@@ -301,8 +301,8 @@ spec:
             elif [ -f netavark ]; then
               echo "Installing Netavark..."
               chmod +x netavark
-              cp netavark /host/usr/local/bin/netavark
-              chmod +x /host/usr/local/bin/netavark
+              cp netavark /host/usr/bin/netavark
+              chmod +x /host/usr/bin/netavark
               echo "Netavark installed successfully"
               netavark_installed=true
             else
@@ -314,11 +314,6 @@ spec:
               exit 1
             fi
             
-            if [ -d deps ]; then
-              echo "Installing dependency libraries..."
-              cp -r deps/* /host/usr/local/lib/ 2>/dev/null || true
-            fi
-            
             cd /
             rm -rf $TEMP_DIR
           }
@@ -327,20 +322,20 @@ spec:
             echo "Verifying installation..."
             
             echo "Checking if binaries exist on host:"
-            ls -la /host/usr/local/bin/criu /host/usr/local/bin/netavark
+            ls -la /host/usr/bin/criu /host/usr/bin/netavark
             
             echo "Checking file types:"
-            file /host/usr/local/bin/criu
-            file /host/usr/local/bin/netavark
+            file /host/usr/bin/criu
+            file /host/usr/bin/netavark
             
-            if [ -x /host/usr/local/bin/criu ]; then
+            if [ -x /host/usr/bin/criu ]; then
               echo "✅ CRIU binary is executable"
             else
               echo "❌ CRIU binary is not executable"
               return 1
             fi
             
-            if [ -x /host/usr/local/bin/netavark ]; then
+            if [ -x /host/usr/bin/netavark ]; then
               echo "✅ Netavark binary is executable"
             else
               echo "❌ Netavark binary is not executable"
@@ -349,8 +344,8 @@ spec:
             
             echo "✅ All tools installed and verified successfully!"
             echo "Note: Runtime verification requires host namespace access"
-            echo "CRIU location: /usr/local/bin/criu"
-            echo "Netavark location: /usr/local/bin/netavark"
+            echo "CRIU location: /usr/bin/criu"
+            echo "Netavark location: /usr/bin/netavark"
           }
           
           setup_kernel_params() {
@@ -409,11 +404,11 @@ spec:
       volumes:
       - name: host-bin
         hostPath:
-          path: /usr/local/bin
+          path: /usr/bin
           type: DirectoryOrCreate
       - name: host-lib
         hostPath:
-          path: /usr/local/lib
+          path: /usr/lib
           type: DirectoryOrCreate
       - name: host-etc
         hostPath:
