@@ -61,18 +61,22 @@ spec:
           - --no-cloud-creds
           {{- end }}
         env:
+          {{- if .Values.operator.tokenFromConfigMap }}
           - name: TOKEN_CONFIGMAP_NAME
             value: {{ .Values.operator.tokenFromConfigMap.name | quote }}
           - name: TOKEN_CONFIGMAP_NAMESPACE
             value: {{ .Values.operator.tokenFromConfigMap.namespace | quote }}
           - name: TOKEN_CONFIGMAP_KEY
             value: {{ .Values.operator.tokenFromConfigMap.key | quote }}
+          {{- end }}
+          {{- if .Values.operator.nameFromConfigMap }}
           - name: CLUSTER_NAME_CONFIGMAP_NAME
             value: {{ .Values.operator.nameFromConfigMap.name | quote }}
           - name: CLUSTER_NAME_CONFIGMAP_NAMESPACE
             value: {{ .Values.operator.nameFromConfigMap.namespace | quote }}
           - name: CLUSTER_NAME_CONFIGMAP_KEY
             value: {{ .Values.operator.nameFromConfigMap.key | quote }}
+          {{- end }}
         image: "{{ .Values.image.repository }}/{{ .Values.operator.image }}:{{ .Values.image.tag }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         name: manager
