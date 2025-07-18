@@ -71,7 +71,6 @@ spec:
                 type: string
             required:
             - nodeGroupName
-            - nodesToRemove
             - recommendationId
             type: object
           status:
