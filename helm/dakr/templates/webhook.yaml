@@ -6,7 +6,7 @@ metadata:
   labels:
     {{- include "dakr.labels" . | nindent 4 }}
 webhooks:
-  - name: {{ include "dakr.fullname" . }}.{{ .Release.Namespace }}.io
+  - name: dakr.devzero.io
     namespaceSelector:
       matchExpressions:
         - key: kubernetes.io/metadata.name
@@ -17,7 +17,7 @@ webhooks:
     rules:
       - apiGroups: [""]
         apiVersions: ["v1"]
-        operations: ["CREATE"]
+        operations: ["CREATE", "UPDATE"]
         resources: ["pods"]
         scope: "*"
     clientConfig:

@@ -69,8 +69,8 @@ spec:
             - |
               #!/bin/sh
               set -e
-
-              WEBHOOK_NAME="{{ include "dakr.fullname" . }}"
+              
+              WEBHOOK_NAME="{{ include "dakr.fullname" . }}-operator"
               NAMESPACE="{{ .Release.Namespace }}"
               SECRET_NAME="{{ include "dakr.fullname" . }}-operator-tls"
               CERT_DIR="/tmp/webhook-certs"

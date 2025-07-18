@@ -1,15 +1,18 @@
+---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: workloadrecommendations.dakr.devzero.io
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.18.0
+  name: nodegrouprecommendations.dakr.devzero.io
 spec:
   group: dakr.devzero.io
   names:
-    kind: WorkloadRecommendation
-    listKind: WorkloadRecommendationList
-    plural: workloadrecommendations
-    singular: workloadrecommendation
-  scope: Namespaced
+    kind: NodeGroupRecommendation
+    listKind: NodeGroupRecommendationList
+    plural: nodegrouprecommendations
+    singular: nodegrouprecommendation
+  scope: Cluster
   versions:
   - additionalPrinterColumns:
     - jsonPath: .status.phase
@@ -21,7 +24,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: WorkloadRecommendation represents a stored workload recommendation
+        description: NodeGroupRecommendation represents a stored node group recommendation
           that can be applied later
         properties:
           apiVersion:
@@ -42,122 +45,21 @@ spec:
           metadata:
             type: object
           spec:
-            description: WorkloadRecommendationSpec defines the desired state of WorkloadRecommendation
+            description: NodeGroupRecommendationSpec defines the desired state of
+              NodeGroupRecommendation
             properties:
               autoApply:
                 description: AutoApply determines if this recommendation should be
                   applied automatically
                 type: boolean
-              containerRecommendations:
-                description: ContainerRecommendations contains the resource recommendations
-                  for each container
-                items:
-                  description: |-
-                    ContainerRecommendationSpec is a plain Go struct for CRD serialization
-                    replaces ContainerRecommendationWrapper
-                  properties:
-                    containerName:
-                      type: string
-                    currentLimit:
-                      properties:
-                        cpu:
-                          format: int64
-                          type: integer
-                        gpu:
-                          format: int64
-                          type: integer
-                        gpuVram:
-                          format: int64
-                          type: integer
-                        memory:
-                          format: int64
-                          type: integer
-                      type: object
-                    currentRequest:
-                      properties:
-                        cpu:
-                          format: int64
-                          type: integer
-                        gpu:
-                          format: int64
-                          type: integer
-                        gpuVram:
-                          format: int64
-                          type: integer
-                        memory:
-                          format: int64
-                          type: integer
-                      type: object
-                    optimizationScore:
-                      format: double
-                      type: number
-                    recommendedLimit:
-                      properties:
-                        cpu:
-                          format: int64
-                          type: integer
-                        gpu:
-                          format: int64
-                          type: integer
-                        gpuVram:
-                          format: int64
-                          type: integer
-                        memory:
-                          format: int64
-                          type: integer
-                      type: object
-                    recommendedRequest:
-                      properties:
-                        cpu:
-                          format: int64
-                          type: integer
-                        gpu:
-                          format: int64
-                          type: integer
-                        gpuVram:
-                          format: int64
-                          type: integer
-                        memory:
-                          format: int64
-                          type: integer
-                      type: object
-                  required:
-                  - containerName
-                  type: object
-                type: array
-              kedaScaledObjects:
-                description: KEDAScaledObjects contains the list of KEDA scaling configuration
-                  recommendations
-                items:
-                  description: |-
-                    KedaScaledObjectRecommendationSpec is a plain Go struct for CRD serialization
-                    replaces KedaScaledObjectRecommendationWrapper
-                  properties:
-                    maxReplicas:
-                      format: int32
-                      type: integer
-                    minReplicas:
-                      format: int32
-                      type: integer
-                    uid:
-                      type: string
-                  required:
-                  - maxReplicas
-                  - minReplicas
-                  - uid
-                  type: object
-                type: array
-              kind:
-                description: Kind is the Kubernetes object kind (Deployment, StatefulSet,
-                  etc.)
-                format: int32
-                type: integer
-              name:
-                description: Name is the name of the target workload
+              nodeGroupName:
+                description: NodeGroupName is the name of the target node group
                 type: string
-              namespace:
-                description: Namespace is the namespace of the target workload
-                type: string
+              nodesToRemove:
+                description: NodesToRemove contains the list of nodes to be removed
+                items:
+                  type: string
+                type: array
               priority:
                 description: Priority determines the order of applying recommendations
                   (higher priority applied first)
@@ -167,23 +69,14 @@ spec:
                 description: RecommendationID is the unique identifier from the dakr
                   service
                 type: string
-              replicaCount:
-                description: ReplicaCount is the recommended replica count
-                format: int32
-                type: integer
-              workloadUid:
-                description: WorkloadUID is the unique identifier of the target workload
-                type: string
             required:
-            - kind
-            - name
-            - namespace
+            - nodeGroupName
+            - nodesToRemove
             - recommendationId
-            - workloadUid
             type: object
           status:
-            description: WorkloadRecommendationStatus defines the observed state of
-              WorkloadRecommendation
+            description: NodeGroupRecommendationStatus defines the observed state
+              of NodeGroupRecommendation
             properties:
               appliedAt:
                 description: AppliedAt is the timestamp when the recommendation was
@@ -275,15 +168,17 @@ spec:
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: nodegrouprecommendations.dakr.devzero.io
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.18.0
+  name: workloadrecommendations.dakr.devzero.io
 spec:
   group: dakr.devzero.io
   names:
-    kind: NodeGroupRecommendation
-    listKind: NodeGroupRecommendationList
-    plural: nodegrouprecommendations
-    singular: nodegrouprecommendation
-  scope: Cluster
+    kind: WorkloadRecommendation
+    listKind: WorkloadRecommendationList
+    plural: workloadrecommendations
+    singular: workloadrecommendation
+  scope: Namespaced
   versions:
   - additionalPrinterColumns:
     - jsonPath: .status.phase
@@ -295,7 +190,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: NodeGroupRecommendation represents a stored node group recommendation
+        description: WorkloadRecommendation represents a stored workload recommendation
           that can be applied later
         properties:
           apiVersion:
@@ -316,21 +211,168 @@ spec:
           metadata:
             type: object
           spec:
-            description: NodeGroupRecommendationSpec defines the desired state of
-              NodeGroupRecommendation
+            description: WorkloadRecommendationSpec defines the desired state of WorkloadRecommendation
             properties:
               autoApply:
                 description: AutoApply determines if this recommendation should be
                   applied automatically
                 type: boolean
-              nodeGroupName:
-                description: NodeGroupName is the name of the target node group
-                type: string
-              nodesToRemove:
-                description: NodesToRemove contains the list of nodes to be removed
+              containerRecommendations:
+                description: ContainerRecommendations contains the resource recommendations
+                  for each container
                 items:
-                  type: string
+                  description: |-
+                    ContainerRecommendationSpec is a plain Go struct for CRD serialization
+                    replaces ContainerRecommendationWrapper
+                  properties:
+                    containerName:
+                      type: string
+                    currentLimit:
+                      properties:
+                        cpu:
+                          format: int64
+                          type: integer
+                        gpu:
+                          format: int64
+                          type: integer
+                        gpuVram:
+                          format: int64
+                          type: integer
+                        memory:
+                          format: int64
+                          type: integer
+                      type: object
+                    currentRequest:
+                      properties:
+                        cpu:
+                          format: int64
+                          type: integer
+                        gpu:
+                          format: int64
+                          type: integer
+                        gpuVram:
+                          format: int64
+                          type: integer
+                        memory:
+                          format: int64
+                          type: integer
+                      type: object
+                    optimizationScore:
+                      type: number
+                    recommendedLimit:
+                      properties:
+                        cpu:
+                          format: int64
+                          type: integer
+                        gpu:
+                          format: int64
+                          type: integer
+                        gpuVram:
+                          format: int64
+                          type: integer
+                        memory:
+                          format: int64
+                          type: integer
+                      type: object
+                    recommendedRequest:
+                      properties:
+                        cpu:
+                          format: int64
+                          type: integer
+                        gpu:
+                          format: int64
+                          type: integer
+                        gpuVram:
+                          format: int64
+                          type: integer
+                        memory:
+                          format: int64
+                          type: integer
+                      type: object
+                  required:
+                  - containerName
+                  type: object
                 type: array
+              kedaScaledObjects:
+                description: KEDAScaledObjects contains the list of KEDA scaling configuration
+                  recommendations
+                items:
+                  description: |-
+                    KedaScaledObjectRecommendationSpec is a plain Go struct for CRD serialization
+                    replaces KedaScaledObjectRecommendationWrapper
+                  properties:
+                    maxReplicas:
+                      format: int32
+                      type: integer
+                    minReplicas:
+                      format: int32
+                      type: integer
+                    uid:
+                      type: string
+                  required:
+                  - maxReplicas
+                  - minReplicas
+                  - uid
+                  type: object
+                type: array
+              kind:
+                description: Kind is the Kubernetes object kind (Deployment, StatefulSet,
+                  etc.)
+                format: int32
+                type: integer
+              labelSelector:
+                description: LabelSelector is the label selector to filter the target
+                  workload
+                properties:
+                  matchExpressions:
+                    description: matchExpressions is a list of label selector requirements.
+                      The requirements are ANDed.
+                    items:
+                      description: |-
+                        A label selector requirement is a selector that contains values, a key, and an operator that
+                        relates the key and values.
+                      properties:
+                        key:
+                          description: key is the label key that the selector applies
+                            to.
+                          type: string
+                        operator:
+                          description: |-
+                            operator represents a key's relationship to a set of values.
+                            Valid operators are In, NotIn, Exists and DoesNotExist.
+                          type: string
+                        values:
+                          description: |-
+                            values is an array of string values. If the operator is In or NotIn,
+                            the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                            the values array must be empty. This array is replaced during a strategic
+                            merge patch.
+                          items:
+                            type: string
+                          type: array
+                          x-kubernetes-list-type: atomic
+                      required:
+                      - key
+                      - operator
+                      type: object
+                    type: array
+                    x-kubernetes-list-type: atomic
+                  matchLabels:
+                    additionalProperties:
+                      type: string
+                    description: |-
+                      matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                      map is equivalent to an element of matchExpressions, whose key field is "key", the
+                      operator is "In", and the values array contains only "value". The requirements are ANDed.
+                    type: object
+                type: object
+                x-kubernetes-map-type: atomic
+              name:
+                description: Name is the name of the target workload
+                type: string
+              namespace:
+                description: Namespace is the namespace of the target workload
+                type: string
               priority:
                 description: Priority determines the order of applying recommendations
                   (higher priority applied first)
@@ -340,14 +382,23 @@ spec:
                 description: RecommendationID is the unique identifier from the dakr
                   service
                 type: string
+              replicaCount:
+                description: ReplicaCount is the recommended replica count
+                format: int32
+                type: integer
+              useLiveMigration:
+                description: UseLiveMigration determines if this recommendation should
+                  be applied through live migration
+                type: boolean
             required:
-            - nodeGroupName
-            - nodesToRemove
+            - kind
+            - name
+            - namespace
             - recommendationId
             type: object
           status:
-            description: NodeGroupRecommendationStatus defines the observed state
-              of NodeGroupRecommendation
+            description: WorkloadRecommendationStatus defines the observed state of
+              WorkloadRecommendation
             properties:
               appliedAt:
                 description: AppliedAt is the timestamp when the recommendation was

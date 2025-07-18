@@ -1,0 +1,101 @@
+{{- if .Values.agent }}
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "dakr.fullname" . }}-agent
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "dakr.labels" . | nindent 4 }}
+    app.kubernetes.io/component: {{ include "dakr.fullname" . }}-agent
+    control-plane: {{ include "dakr.fullname" . }}-agent
+spec:
+  selector:
+    matchLabels:
+      {{- include "dakr.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: {{ include "dakr.fullname" . }}-agent
+      control-plane: {{ include "dakr.fullname" . }}-agent
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/default-container: agent
+      labels:
+        {{- include "dakr.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: {{ include "dakr.fullname" . }}-agent
+        control-plane: {{ include "dakr.fullname" . }}-agent
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                - key: kubernetes.io/arch
+                  operator: In
+                  values:
+                    - amd64
+                    - arm64
+                - key: kubernetes.io/os
+                  operator: In
+                  values:
+                    - linux
+      hostIPC: true
+      hostNetwork: true
+      containers:
+      - command:
+        - /agent
+        image: "{{ .Values.image.repository }}/{{ .Values.agent.image}}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        env:
+         - name: CONFIG_FILENAME
+           value: {{ .Values.agent.configFilename | default "development" }}
+         - name: AGENT_BIND
+           value: {{ .Values.agent.bind | default "/containerd.sock" }}
+         - name: AGENT_PORT
+           value: {{ .Values.agent.port | default 54192 | quote }}
+         - name: NODE_NAME
+           valueFrom:
+             fieldRef:
+               fieldPath: spec.nodeName
+         - name: AGENT_GRAPH_ROOT
+           value: /graph-root
+        name: agent
+        ports: 
+          - name: http
+            protocol: TCP
+            containerPort: {{ .Values.agent.port | default 54192 }}
+            hostPort: {{ .Values.agent.port | default 54192 }}
+        securityContext:
+          runAsUser: 0
+          runAsGroup: 0
+          privileged: true
+          capabilities:
+            add:
+              - SYS_ADMIN
+        resources:
+          {{- toYaml .Values.agent.resources | nindent 10 }}
+        volumeMounts:
+          - name: containerd
+            mountPath: "/containerd.sock"
+          - name: checkpoints
+            mountPath: "/var/lib/kubelet/checkpoints"
+          - name: graph-root
+            mountPath: /graph-root
+      volumes:
+        - name: containerd
+          hostPath:
+            path: {{ .Values.agent.containerdSocket | default "/var/run/containerd/containerd.sock" }}
+            # This file is of type Socket, but we want to prevent kubernetes from running checks for it.
+            # From https://kubernetes.io/docs/concepts/storage/volumes/#hostpath: 
+            # "Socket": A UNIX socket must exist at the given path
+            # "": No checks will be performed before mounting the hostPath volume.
+            type: ""
+        - name: checkpoints
+          hostPath:
+            path: /var/lib/kubelet/checkpoints
+            type: ""
+        - name: graph-root
+          emptyDir:
+            sizeLimit: 5Gi
+            medium: "Memory"
+      serviceAccountName: {{ include "dakr.fullname" . }}-agent-sa
+      terminationGracePeriodSeconds: 10
+{{- end }}
