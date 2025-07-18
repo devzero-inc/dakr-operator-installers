@@ -7,9 +7,9 @@ cloud: ""
 
 
 image:
-  repository: devzeroinc
+  repository: docker.io/devzeroinc
   # This sets the pull policy for images.
-  pullPolicy: Always
+  pullPolicy: IfNotPresent 
   # Overrides the image tag whose default is the chart appVersion.
   tag: "latest"
 
@@ -25,11 +25,11 @@ operator:
       cpu: 10m
       memory: 64Mi
   endpoint: "https://dakr.devzero.io"
-  clusterToken: "REPLACE WITH TOKEN" # If this is empty, the operator will attempt to read from the ConfigMap below.
+  clusterToken: "REPLACE_WITH_TOKEN" # If this is empty, the operator will attempt to read from the ConfigMap below.
                    # If set to a non-empty string, this value will be used directly.
-  clusterName: "REPLACE WITH CLUSTER NAME" # If this is empty, the operator will attempt to read from the ConfigMap below.
+  clusterName: "REPLACE_WITH_CLUSTER_NAME" # If this is empty, the operator will attempt to read from the ConfigMap below.
                   # If set to a non-empty string, this value will be used directly.
-  clusterLocation: "CLUSTER LOCATION HERE"  # usually the cloud region code for where the cluster is running, can also be the zone if the cluster is zonal
+  clusterLocation: "REPLACE_WITH_CLUSTER_LOCATION"  # usually the cloud region code for where the cluster is running, can also be the zone if the cluster is zonal
   # noCloudCreds: true # If true, operator will not attempt to perform node scaling operations, and will not require cloud credentials
   # tokenFromConfigMap: # If clusterToken is not specified above, operator will read from below ConfigMap value
   #   name: "devzero-zxporter-env-config" # Name of the ConfigMap
@@ -70,8 +70,22 @@ operator:
     annotations:
       # Replace with the appropriate key-value pair from your Terraform output
       # (see instructions above). 
-      "REPLACE WITH ANNOTATION KEY": "REPLACE WTIH ANNOTATION VALUE"
+      "REPLACE_WITH_ANNOTATION_KEY": "REPLACE_WITH_ANNOTATION_VALUE"
+
+agent:
+  image: dakr-agent
+  resources:
+    limits:
+      cpu: 500m
+      memory: 128Mi
+    requests:
+      cpu: 10m
+      memory: 64Mi
+  configFilename: development
+  bind: "/containerd.sock"
+  port: 54192
+  containerdSocket: "/var/run/containerd/containerd.sock"
 
 webhook:
-  enabled: false
+  enabled: true
   caBundle: ""  # Base64 encoded CA bundle for webhook
