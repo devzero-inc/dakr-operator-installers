@@ -1,4 +1,4 @@
-{{- if .Values.webhook.enabled }}
+{{- if and .Values.webhook.enabled .Values.operator.enabled }}
 apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
 metadata:
@@ -30,4 +30,5 @@ webhooks:
     admissionReviewVersions: ["v1"]
     sideEffects: None
     timeoutSeconds: 2
+    failurePolicy: Ignore
 {{- end }} 

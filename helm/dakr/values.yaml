@@ -16,6 +16,7 @@ image:
 imagePullSecrets: []
 
 operator:
+  enabled: true
   image: dakr-operator
   resources:
     limits:
@@ -73,14 +74,15 @@ operator:
       "REPLACE_WITH_ANNOTATION_KEY": "REPLACE_WITH_ANNOTATION_VALUE"
 
 agent:
+  enabled: true
   image: dakr-agent
   resources:
     limits:
       cpu: 500m
-      memory: 128Mi
+      memory: 1Gi
     requests:
       cpu: 10m
-      memory: 64Mi
+      memory: 512Mi
   configFilename: development
   bind: "/containerd.sock"
   port: 54192

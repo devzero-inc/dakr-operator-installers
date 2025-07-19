@@ -1,3 +1,4 @@
+{{- if .Values.operator.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -153,3 +154,4 @@ spec:
       protocol: TCP
       port: {{ .Values.operator.debugPort | default 8082 }}
       targetPort: debug
+{{- end }}
