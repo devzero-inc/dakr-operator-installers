@@ -12,6 +12,7 @@ on:
           - major
           - minor
           - patch
+
 env:
   REGISTRY: registry-1.docker.io
   CHART_NAME: dakr-operator
@@ -65,7 +66,7 @@ jobs:
         echo "Last version: $LAST_VERSION"
         echo "last_version=$LAST_VERSION" >> $GITHUB_OUTPUT
 
-    - name: Bump version
+    - name: Bump version takes the most recent tag and bumps the version in it
       id: bump_version
       run: |
         LAST_VERSION="${{ steps.get_version.outputs.last_version }}"
@@ -91,7 +92,7 @@ jobs:
         echo "Bumped version: $NEW_VERSION"
         echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
 
-    - name: Create and push new tag
+    - name: Create and push the newly created tag
       run: |
         git config --global user.email "actions@github.com"
         git config --global user.name "GitHub Actions"
