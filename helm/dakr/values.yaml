@@ -11,13 +11,14 @@ image:
   # This sets the pull policy for images.
   pullPolicy: Always 
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "latest"
+  tag: "v0.0.10"
 
 imagePullSecrets: []
 
 operator:
   enabled: true
   image: dakr-operator
+  replicas: 3
   resources:
     limits:
       cpu: 500m
