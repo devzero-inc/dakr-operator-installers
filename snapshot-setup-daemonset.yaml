@@ -384,6 +384,10 @@ spec:
             echo "leave-stopped" >> /host/etc/criu/runc.conf
             echo "✅ CRIU config written to /host/etc/criu/runc.conf"
           }
+
+          mark_ready() {
+            echo "1" > /ready
+          }
           
           main() {
             detect_arch
@@ -391,6 +395,7 @@ spec:
             configure_criu
             verify_installation
             setup_kernel_params
+            mark_ready
             
             echo "DAKR snapshot tools setup completed successfully on node: $NODE_NAME"
             echo "Node is now ready for container checkpointing and restoration"
@@ -399,9 +404,17 @@ spec:
             while true; do
               sleep 3600
             done
+
+            rm -f /ready || true
           }
           
           main
+        readinessProbe:
+          exec:
+            command:
+            - cat
+            - /ready
+          periodSeconds: 5
       volumes:
       - name: host-bin
         hostPath:
