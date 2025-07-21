@@ -178,7 +178,7 @@ spec:
             local api_response=""
             
             echo "Fetching releases from public GitHub API..."
-            api_response=$(curl -s "https://api.github.com/repos/devzero-inc/dakr-operator/releases")
+            api_response=$(curl -s "https://api.github.com/repos/devzero-inc/dakr-operator-installers/releases")
             
             echo "API response sample:"
             echo "$api_response" | head -5
