@@ -114,10 +114,12 @@ jobs:
           --version ${{ steps.bump_version.outputs.new_version }} \
           --app-version ${{ steps.bump_version.outputs.new_version }} \
           --destination helm/packages
+        mv helm/packages/dakr-${{ steps.bump_version.outputs.new_version }}.tgz \
+          helm/packages/dakr-operator-${{ steps.bump_version.outputs.new_version }}.tgz
 
     - name: Push Helm chart to Docker Hub OCI registry
       run: |
-        helm push helm/packages/dakr-${{ steps.bump_version.outputs.new_version }}.tgz \
+        helm push helm/packages/dakr-operator-${{ steps.bump_version.outputs.new_version }}.tgz \
           oci://${{ env.REGISTRY }}/${{ env.ORG }}/dakr-operator
 
     - name: Update Chart.yaml version and appVersion
