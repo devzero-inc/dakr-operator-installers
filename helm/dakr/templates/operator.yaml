@@ -14,7 +14,7 @@ spec:
       {{- include "dakr.selectorLabels" . | nindent 6 }}
       app.kubernetes.io/component: {{ include "dakr.fullname" . }}-operator
       control-plane: {{ include "dakr.fullname" . }}-operator
-  replicas: 1
+  replicas: {{ .Values.operator.replicas | default 2 }}
   template:
     metadata:
       annotations:
