@@ -43,9 +43,9 @@ jobs:
 
     - name: Helm registry login
       run: |
-        echo "${{ secrets.DOCKERHUB_TOKEN }}" | \
+        echo "${{ secrets.DOCKERHUB_ZXPORTER_BALANCE_TOKEN }}" | \
           helm registry login registry-1.docker.io \
-            --username "${{ secrets.DOCKERHUB_USERNAME }}" \
+            --username "${{ secrets.DOCKERHUB_ZXPORTER_BALANCE_USERNAME }}" \
             --password-stdin
 
     - name: Enable Helm OCI support
@@ -114,12 +114,10 @@ jobs:
           --version ${{ steps.bump_version.outputs.new_version }} \
           --app-version ${{ steps.bump_version.outputs.new_version }} \
           --destination helm/packages
-        mv helm/packages/dakr-${{ steps.bump_version.outputs.new_version }}.tgz \
-          helm/packages/dakr-operator-${{ steps.bump_version.outputs.new_version }}.tgz
 
     - name: Push Helm chart to Docker Hub OCI registry
       run: |
-        helm push helm/packages/dakr-operator-${{ steps.bump_version.outputs.new_version }}.tgz \
+        helm push helm/packages/dakr-${{ steps.bump_version.outputs.new_version }}.tgz \
           oci://${{ env.REGISTRY }}/${{ env.ORG }}/dakr-operator
 
     - name: Update Chart.yaml version and appVersion
