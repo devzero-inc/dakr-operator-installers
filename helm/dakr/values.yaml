@@ -17,7 +17,7 @@ imagePullSecrets: []
 
 operator:
   enabled: true
-  image: dakr-agent
+  image: dakr-operator
   replicas: 3
   resources:
     limits:

@@ -1,6 +1,9 @@
 name: Release Helm Chart
 
 on:
+  push:
+    branches:
+      - garvit/images-fix
   workflow_dispatch:
     inputs:
       version_change:
