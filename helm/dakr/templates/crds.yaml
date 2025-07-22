@@ -52,6 +52,14 @@ spec:
                 description: AutoApply determines if this recommendation should be
                   applied automatically
                 type: boolean
+              currentNodeCount:
+                description: CurrentNodeCount is the current number of nodes in the
+                  node group
+                type: integer
+              desiredNodeCount:
+                description: DesiredNodeCount is the desired number of nodes in the
+                  node group
+                type: integer
               nodeGroupName:
                 description: NodeGroupName is the name of the target node group
                 type: string
