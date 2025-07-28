@@ -49,3 +49,8 @@ Selector labels
 app.kubernetes.io/name: {{ include "dakr.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
+
+{{- define "dakr.leaderElection" -}}
+{{- $replicas := .Values.operator.replicas | int }}
+{{- ne $replicas 1 }}
+{{- end }}

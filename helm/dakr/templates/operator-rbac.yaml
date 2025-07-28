@@ -40,11 +40,21 @@ rules:
   verbs: ["update"]
 - apiGroups: ["rbac.authorization.k8s.io"]
   resources: ["clusterroles"]
-  verbs: ["get", "update", "patch"]
+  verbs: ["get", "update", "patch", "escalate"]
 {{- if .Capabilities.APIVersions.Has "keda.sh/v1alpha1/ScaledObject" }}
 - apiGroups: ["keda.sh"]
   resources: ["scaledobjects"]
   verbs: ["get", "list", "update", "patch"]
+{{- end }}
+{{- if .Capabilities.APIVersions.Has "argoproj.io/v1alpha1/Application" }}
+- apiGroups: ["argoproj.io"]
+  resources: ["applications"]
+  verbs: ["get", "list", "watch", "update", "patch"]
+{{- end }}
+{{- if .Capabilities.APIVersions.Has "argoproj.io/v1alpha1/Rollout" }}
+- apiGroups: ["argoproj.io"]
+  resources: ["rollouts"]
+  verbs: ["get", "list", "watch", "update", "patch"]
 {{- end }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1

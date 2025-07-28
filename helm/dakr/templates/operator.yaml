@@ -58,6 +58,9 @@ spec:
           - --cluster-name={{ .Values.operator.clusterName }}
           - --cluster-location={{ .Values.operator.clusterLocation }}
           - --debug-http-addr=:{{ .Values.operator.debugPort | default 8082 }}
+          - --argocd-patching={{ .Values.operator.features.argocdPatching | default false }}
+          - --leader-election={{ include "dakr.leaderElection" . }}
+          - --leader-election-namespace={{ .Release.Namespace }}
           {{- if .Values.webhook.enabled }}
           - --webhook-cert-path=/etc/tls
           {{- end }}
