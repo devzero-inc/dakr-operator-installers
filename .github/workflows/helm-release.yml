@@ -99,6 +99,11 @@ jobs:
         git tag "${{ env.CHART_TAG_PREFIX }}${{ steps.bump_version.outputs.new_version }}"
         git push origin "${{ env.CHART_TAG_PREFIX }}${{ steps.bump_version.outputs.new_version }}"
 
+    - name: Renaming operator (from dakr in helm/dakr/Chart.yaml, to dakr-operator) to match upstream repo name
+      run: |
+        # on mac: sed -i '' 's/^name: dakr$/name: dakr-operator/' helm/dakr/Chart.yaml
+        sed -i 's/^name: dakr$/name: dakr-operator/' helm/dakr/Chart.yaml
+
     - name: Update chart dependencies
       run: |
         helm dependency update helm/dakr
@@ -114,10 +119,6 @@ jobs:
           --version ${{ steps.bump_version.outputs.new_version }} \
           --app-version ${{ steps.bump_version.outputs.new_version }} \
           --destination helm/packages
-
-    - name: Renaming operator tarblob to match upstream repo name
-      run: |
-        mv helm/packages/dakr-${{ steps.bump_version.outputs.new_version }}.tgz helm/packages/dakr-operator-${{ steps.bump_version.outputs.new_version }}.tgz
 
     - name: Push Helm chart to Docker Hub OCI registry
       run: |
