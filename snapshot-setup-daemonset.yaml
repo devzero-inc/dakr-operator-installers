@@ -25,7 +25,7 @@ spec:
         effect: NoExecute
       containers:
       - name: snapshot-setup
-        image: alpine:3.18
+        image: public.ecr.aws/devzeroinc/alpine@sha256:de0eb0b3f2a47ba1eb89389859a9bd88b28e82f5826b6969ad604979713c2d4f
         imagePullPolicy: IfNotPresent
         securityContext:
           privileged: true
