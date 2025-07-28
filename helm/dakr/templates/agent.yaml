@@ -39,6 +39,7 @@ spec:
                     - linux
       hostIPC: true
       hostNetwork: true
+      hostPID: true
       containers:
       - command:
         - /agent
@@ -69,7 +70,7 @@ spec:
           privileged: true
           capabilities:
             add:
-              - SYS_ADMIN
+              - CAP_SYS_ADMIN
         resources:
           {{- toYaml .Values.agent.resources | nindent 10 }}
         volumeMounts:
