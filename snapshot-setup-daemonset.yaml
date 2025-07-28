@@ -381,6 +381,7 @@ spec:
             echo "tcp-established" > /host/etc/criu/runc.conf
             echo "tcp-close" >> /host/etc/criu/runc.conf
             echo "enable-fs all" >> /host/etc/criu/runc.conf
+            echo "leave-stopped" >> /host/etc/criu/runc.conf
             echo "✅ CRIU config written to /host/etc/criu/runc.conf"
           }
 
