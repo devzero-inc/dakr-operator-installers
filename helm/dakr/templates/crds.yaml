@@ -220,6 +220,16 @@ spec:
           spec:
             description: WorkloadRecommendationSpec defines the desired state of WorkloadRecommendation
             properties:
+              actionTriggers:
+                description: ActionTriggers contains the list of action triggers for
+                  the recommendation
+                items:
+                  description: ActionTrigger represents a trigger for an action
+                  enum:
+                  - OnDetection
+                  - Immediate
+                  type: string
+                type: array
               autoApply:
                 description: AutoApply determines if this recommendation should be
                   applied automatically
