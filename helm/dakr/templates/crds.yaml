@@ -310,6 +310,16 @@ spec:
                   - containerName
                   type: object
                 type: array
+              detectionTriggers:
+                description: DetectionTriggers contains the list of detection triggers
+                  for the recommendation
+                items:
+                  description: DetectionTrigger represents a trigger for a detection
+                  enum:
+                  - PodCreation
+                  - PodUpdate
+                  type: string
+                type: array
               kedaScaledObjects:
                 description: KEDAScaledObjects contains the list of KEDA scaling configuration
                   recommendations
