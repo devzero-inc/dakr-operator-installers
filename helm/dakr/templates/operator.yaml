@@ -66,6 +66,7 @@ spec:
           - --image-registry={{ .Values.operator.snapshotRegistry.registry }}
           - --image-registry-repo-name={{ .Values.operator.snapshotRegistry.repoName }}
           - --image-registry-auth-provider={{ .Values.operator.snapshotRegistry.authProvider }}
+          - --service-account-name=system:serviceaccount:{{ .Release.Namespace }}:{{ .Values.operator.serviceAccount.name }}
           {{- if .Values.webhook.enabled }}
           - --webhook-cert-path=/etc/tls
           {{- end }}
