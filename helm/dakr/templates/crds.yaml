@@ -413,6 +413,10 @@ spec:
                 description: ReplicaCount is the recommended replica count
                 format: int32
                 type: integer
+              schedulerName:
+                description: SchedulerName is the name for the custom scheduler this
+                  workload should be scheduled by
+                type: string
               useLiveMigration:
                 description: UseLiveMigration determines if this recommendation should
                   be applied through live migration

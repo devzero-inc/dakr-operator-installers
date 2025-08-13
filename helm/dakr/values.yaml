@@ -11,7 +11,7 @@ image:
   # This sets the pull policy for images.
   pullPolicy: Always 
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "v0.0.16"
+  tag: "v0.0.17"
 
 imagePullSecrets: []
 
@@ -45,6 +45,7 @@ operator:
   #   name: "devzero-zxporter-env-config" # Name of the ConfigMap
   #   namespace: "devzero-zxporter"       # Namespace of the ConfigMap
   #   key: "KUBE_CONTEXT_NAME"            # Key in the ConfigMap's data to get the cluster name from
+  customScheduler: true
   port: 9443
   debugPort: 8082
   features:
@@ -81,6 +82,12 @@ operator:
       # Replace with the appropriate key-value pair from your Terraform output
       # (see instructions above). 
       "REPLACE_WITH_ANNOTATION_KEY": "REPLACE_WITH_ANNOTATION_VALUE"
+
+scheduler:
+  image:
+    tag: "v0.0.2"
+
+
 
 agent:
   enabled: true
