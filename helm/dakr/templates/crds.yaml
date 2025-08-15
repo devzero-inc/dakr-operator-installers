@@ -270,12 +270,20 @@ spec:
                         cpu:
                           format: int64
                           type: integer
+                        cpuAction:
+                          type: string
                         gpu:
                           format: int64
                           type: integer
+                        gpuAction:
+                          type: string
                         gpuVram:
                           format: int64
                           type: integer
+                        gpuVramAction:
+                          type: string
+                        memAction:
+                          type: string
                         memory:
                           format: int64
                           type: integer
@@ -285,12 +293,20 @@ spec:
                         cpu:
                           format: int64
                           type: integer
+                        cpuAction:
+                          type: string
                         gpu:
                           format: int64
                           type: integer
+                        gpuAction:
+                          type: string
                         gpuVram:
                           format: int64
                           type: integer
+                        gpuVramAction:
+                          type: string
+                        memAction:
+                          type: string
                         memory:
                           format: int64
                           type: integer
@@ -302,12 +318,20 @@ spec:
                         cpu:
                           format: int64
                           type: integer
+                        cpuAction:
+                          type: string
                         gpu:
                           format: int64
                           type: integer
+                        gpuAction:
+                          type: string
                         gpuVram:
                           format: int64
                           type: integer
+                        gpuVramAction:
+                          type: string
+                        memAction:
+                          type: string
                         memory:
                           format: int64
                           type: integer
@@ -317,12 +341,20 @@ spec:
                         cpu:
                           format: int64
                           type: integer
+                        cpuAction:
+                          type: string
                         gpu:
                           format: int64
                           type: integer
+                        gpuAction:
+                          type: string
                         gpuVram:
                           format: int64
                           type: integer
+                        gpuVramAction:
+                          type: string
+                        memAction:
+                          type: string
                         memory:
                           format: int64
                           type: integer
