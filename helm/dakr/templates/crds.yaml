@@ -18,6 +18,9 @@ spec:
     - jsonPath: .status.phase
       name: Status
       type: string
+    - jsonPath: .status.appliedAt
+      name: Applied-At
+      type: date
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
@@ -82,6 +85,8 @@ spec:
             - recommendationId
             type: object
           status:
+            default:
+              phase: Pending
             description: NodeGroupRecommendationStatus defines the observed state
               of NodeGroupRecommendation
             properties:
@@ -157,6 +162,7 @@ spec:
                 format: int64
                 type: integer
               phase:
+                default: Pending
                 description: Phase represents the current phase of the recommendation
                 enum:
                 - Pending
@@ -191,8 +197,23 @@ spec:
     - jsonPath: .status.phase
       name: Status
       type: string
+    - jsonPath: .spec.kind
+      name: Kind
+      type: string
+    - jsonPath: .spec.name
+      name: Workload
+      type: string
+    - jsonPath: .spec.actionTriggers
+      name: Action
+      type: string
+    - jsonPath: .spec.schedulerName
+      name: Scheduler
+      type: string
     - jsonPath: .metadata.creationTimestamp
       name: Age
+      type: date
+    - jsonPath: .status.appliedAt
+      name: Last-Applied
       type: date
     name: v1alpha1
     schema:
@@ -345,8 +366,7 @@ spec:
               kind:
                 description: Kind is the Kubernetes object kind (Deployment, StatefulSet,
                   etc.)
-                format: int32
-                type: integer
+                type: string
               labelSelector:
                 description: LabelSelector is the label selector to filter the target
                   workload
@@ -428,6 +448,8 @@ spec:
             - recommendationId
             type: object
           status:
+            default:
+              phase: Pending
             description: WorkloadRecommendationStatus defines the observed state of
               WorkloadRecommendation
             properties:
@@ -503,6 +525,7 @@ spec:
                 format: int64
                 type: integer
               phase:
+                default: Pending
                 description: Phase represents the current phase of the recommendation
                 enum:
                 - Pending
