@@ -11,7 +11,7 @@ image:
   # This sets the pull policy for images.
   pullPolicy: Always 
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "v0.0.20"
+  tag: "v0.0.21"
 
 imagePullSecrets: []
 
@@ -27,6 +27,7 @@ operator:
       cpu: 10m
       memory: 64Mi
   endpoint: "https://dakr.devzero.io"
+  logLevel: "info"
   snapshotRegistry:
     registry: "ttl.sh"
     repoName: ""
