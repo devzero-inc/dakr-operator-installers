@@ -27,6 +27,11 @@ spec:
         app.kubernetes.io/component: {{ include "dakr.fullname" . }}-operator
         control-plane: {{ include "dakr.fullname" . }}-operator
     spec:
+      nodeSelector:
+        kubernetes.io/os: linux
+      tolerations:
+        - effect: NoSchedule
+          operator: Exists
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:

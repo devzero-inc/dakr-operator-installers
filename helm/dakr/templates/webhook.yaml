@@ -30,6 +30,13 @@ webhooks:
         operations: ["CREATE", "UPDATE"]
         resources: ["jobs", "cronjobs"]
         scope: "*"
+      {{- if .Capabilities.APIVersions.Has "argoproj.io/v1alpha1/Rollout" }}
+      - apiGroups: ["argoproj.io"]
+        apiVersions: ["v1alpha1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["rollouts"]
+        scope: "*"
+      {{- end }}
     clientConfig:
       service:
         namespace: {{ .Release.Namespace }}
