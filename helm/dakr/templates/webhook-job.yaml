@@ -58,6 +58,11 @@ metadata:
 spec:
   template:
     spec:
+      nodeSelector:
+        kubernetes.io/os: linux
+      tolerations:
+        - effect: NoSchedule
+          operator: Exists
       serviceAccountName: {{ include "dakr.fullname" . }}-webhook-cert-sa
       restartPolicy: OnFailure
       containers:
@@ -124,6 +129,11 @@ metadata:
 spec:
   template:
     spec:
+      nodeSelector:
+        kubernetes.io/os: linux
+      tolerations:
+        - effect: NoSchedule
+          operator: Exists
       serviceAccountName: {{ include "dakr.fullname" . }}-webhook-cert-sa
       restartPolicy: OnFailure
       containers:

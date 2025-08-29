@@ -23,6 +23,11 @@ spec:
         app.kubernetes.io/component: {{ include "dakr.fullname" . }}-agent
         control-plane: {{ include "dakr.fullname" . }}-agent
     spec:
+      nodeSelector:
+        kubernetes.io/os: linux
+      tolerations:
+        - effect: NoSchedule
+          operator: Exists
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
