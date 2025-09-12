@@ -45,6 +45,28 @@ subjects:
   name: dz-scheduler
   namespace: kube-system
 ---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: dz-scheduler-configmap-reader
+rules:
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "watch", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: dz-scheduler-configmap-reader
+subjects:
+- kind: ServiceAccount
+  name: dz-scheduler
+  namespace: kube-system
+roleRef:
+  kind: ClusterRole
+  name: dz-scheduler-configmap-reader
+  apiGroup: rbac.authorization.k8s.io
+---
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -59,20 +81,61 @@ data:
         pluginConfig:
         - name: TargetAllocated 
           args:
-            memoryAllocatedPercent: 80
-            cpuAllocatedPercent: 80
+            memoryAllocatedPercent: 99
+            cpuAllocatedPercent: 99
+        - name: LimitOverProvisionControl 
+          args:
+            cpuOverProvisionPenalizeRatio: 180
+            memoryOverProvisionPenalizeRatio: 180
+        - name: NodeCost
+          args:
+            controlPlaneAddress: {{ .Values.scheduler.nodeCost.controlPlaneAddress | quote }}
+            controlPlaneToken: {{ .Values.scheduler.nodeCost.controlPlaneToken | quote }}
+            tokenFromConfigMap:
+              name: {{ .Values.scheduler.nodeCost.tokenFromConfigMap.name | quote }}
+              namespace: {{ .Values.scheduler.nodeCost.tokenFromConfigMap.namespace | quote }}
+              key: {{ .Values.scheduler.nodeCost.tokenFromConfigMap.key | quote }}
+        - name: PodTopologySpread
+          args:
+            defaultingType: "List"
         plugins:
           preScore:
             enabled:
+            - name: 'TaintToleration'
+              weight: 6
+            - name: 'NodeAffinity'
+              weight: 5
+            - name: 'PodTopologySpread'
+              weight: 5
+            - name: 'InterPodAffinity'
+              weight: 5
             - name: 'TargetAllocated'
+              weight: 3
+            - name: 'LimitOverProvisionControl'
               weight: 2
+            - name: 'NodeCost'
+              weight: 4
             disabled:
             - name: 'NodeResourcesFit'
             - name: 'NodeResourcesBalancedAllocation'
           score:
             enabled:
+            - name: 'TaintToleration'
+              weight: 6
+            - name: 'NodeAffinity'
+              weight: 5
+            - name: 'PodTopologySpread'
+              weight: 5
+            - name: 'InterPodAffinity'
+              weight: 5
+            - name: 'ImageLocality'
+              weight: 1
             - name: 'TargetAllocated'
+              weight: 3
+            - name: 'LimitOverProvisionControl'
               weight: 2
+            - name: 'NodeCost'
+              weight: 4
             disabled:
             - name: 'NodeResourcesFit'
             - name: 'NodeResourcesBalancedAllocation'
@@ -100,6 +163,7 @@ spec:
         tier: control-plane
         version: second
     spec:
+      priorityClassName: system-cluster-critical
       nodeSelector:
         kubernetes.io/os: linux
       tolerations:
@@ -138,4 +202,21 @@ spec:
         - name: config-volume
           configMap:
             name: dz-scheduler-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dz-scheduler
+  namespace: kube-system
+  labels:
+    component: scheduler
+    tier: control-plane
+spec:
+  selector:
+    component: scheduler
+    tier: control-plane
+  ports:
+    - name: https-healthz
+      port: 443
+      targetPort: 10259
 {{- end }}

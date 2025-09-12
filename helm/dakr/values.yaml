@@ -86,7 +86,14 @@ operator:
 
 scheduler:
   image:
-    tag: "v0.0.2"
+    tag: "v0.0.3"
+  nodeCost:
+    controlPlaneAddress: "https://dakr.devzero.io"
+    controlPlaneToken: ""
+    # tokenFromConfigMap: # If clusterToken is not specified above, operator will read from below ConfigMap value
+    #   name: "devzero-zxporter-env-config" # Name of the ConfigMap
+    #   namespace: "devzero-zxporter" # Namespace of the ConfigMap
+    #   key: "CLUSTER_TOKEN" # Key in the ConfigMap's data to get the token
 
 
 
