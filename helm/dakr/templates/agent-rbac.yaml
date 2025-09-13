@@ -1,8 +1,9 @@
 {{- if .Values.agent }}
+
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: {{ include "dakr.fullname" . }}-agent-sa
+  name: {{ include "dakr.fullname" . }}-agent
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "dakr.labels" . | nindent 4 }}
@@ -10,42 +11,92 @@ metadata:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ include "dakr.fullname" . }}-agent-role
+  name: {{ include "dakr.fullname" . }}-agent:installer
   labels:
     {{- include "dakr.labels" . | nindent 4 }}
 rules:
-  - apiGroups: [""]
-    resources: ["pods", "namespaces"]
-    verbs: ["get", "list"]
-  - apiGroups: ["metrics.k8s.io"]
-    resources: ["pods"]
-    verbs: ["get", "list"]
-  - apiGroups: [""]
-    resources: ["nodes"]
-    verbs: ["get", "list"]
-  - apiGroups: [""]
-    verbs: ["*"]
-    resources:
-      - nodes/log
-      - nodes/metrics
-      - nodes/proxy
-      - nodes/stats
-  - apiGroups: [ "" ]
-    resources: ["nodes/proxy", "persistentvolumeclaims", "persistentvolumes"]
-    verbs: ["get", "list", "watch"]
+- apiGroups:
+  - node.k8s.io
+  resources:
+  - runtimeclasses
+  verbs:
+  - create
+  - delete
+  - update
+- apiGroups:
+  - apiextensions.k8s.io
+  resources:
+  - customresourcedefinitions
+  verbs:
+  - create
+  - get
+  - list
+  - update
+  - patch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "dakr.fullname" . }}-agent:node
+  labels:
+    {{- include "dakr.labels" . | nindent 4 }}
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - dakr.devzero.io
+  resources:
+  - checkpointrestores
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - dakr.devzero.io
+  resources:
+  - checkpointrestores/status
+  verbs:
+  - get
+  - update
+  - patch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: {{ include "dakr.fullname" . }}-agent-crb
+  name: {{ include "dakr.fullname" . }}-agent:installer
   labels:
     {{- include "dakr.labels" . | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: {{ include "dakr.fullname" . }}-agent-role
+  name: {{ include "dakr.fullname" . }}-agent:installer
 subjects:
 - kind: ServiceAccount
-  name: {{ include "dakr.fullname" . }}-agent-sa
+  name: {{ include "dakr.fullname" . }}-agent
+  namespace: {{ .Release.Namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "dakr.fullname" . }}-agent:node
+  labels:
+    {{- include "dakr.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "dakr.fullname" . }}-agent:node
+subjects:
+- kind: ServiceAccount
+  name: {{ include "dakr.fullname" . }}-agent
   namespace: {{ .Release.Namespace }}
 {{- end }}
