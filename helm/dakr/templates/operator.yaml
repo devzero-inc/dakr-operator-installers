@@ -55,7 +55,7 @@ spec:
         - /operator
         args:
           - --health-probe-bind-address=:8081
-          - --agent-port=54192
+          - --agent-port={{ .Values.agent.port | default 8090 }}
           - --agent-namespace={{ .Release.Namespace }}
           - --agent-app-name={{ include "dakr.fullname" . }}-agent
           - --endpoint={{ .Values.operator.endpoint }}
@@ -68,9 +68,6 @@ spec:
           - --node-group-rec-batch-size={{ .Values.operator.features.nodeGroupRecBatchSize | default 1 }}
           - --leader-election={{ include "dakr.leaderElection" . }}
           - --leader-election-namespace={{ .Release.Namespace }}
-          - --image-registry={{ .Values.operator.snapshotRegistry.registry }}
-          - --image-registry-repo-name={{ .Values.operator.snapshotRegistry.repoName }}
-          - --image-registry-auth-provider={{ .Values.operator.snapshotRegistry.authProvider }}
           - --service-account-name=system:serviceaccount:{{ .Release.Namespace }}:{{ .Values.operator.serviceAccount.name }}
           - --custom-scheduler={{ .Values.operator.customScheduler }}
           - --zap-log-level={{ .Values.operator.logLevel }}

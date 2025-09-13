@@ -23,8 +23,14 @@ spec:
         app.kubernetes.io/component: {{ include "dakr.fullname" . }}-agent
         control-plane: {{ include "dakr.fullname" . }}-agent
     spec:
+      serviceAccountName: {{ include "dakr.fullname" . }}-agent
+      hostIPC: true
+      hostNetwork: true
+      hostPID: true
+      dnsPolicy: ClusterFirstWithHostNet
+      terminationGracePeriodSeconds: 10
       nodeSelector:
-        kubernetes.io/os: linux
+        dakr.devzero.io/checkpoint-node: "true"
       tolerations:
         - effect: NoSchedule
           operator: Exists
@@ -42,66 +48,141 @@ spec:
                   operator: In
                   values:
                     - linux
-      hostIPC: true
-      hostNetwork: true
-      hostPID: true
-      containers:
-      - command:
-        - /agent
-        image: "{{ .Values.image.repository }}/{{ .Values.agent.image}}:{{ .Values.image.tag }}"
+      initContainers:
+      - name: installer
+        image: "{{ .Values.image.repository }}/{{ .Values.agent.installerImage }}:{{ .Values.image.tag }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
-        env:
-         - name: CONFIG_FILENAME
-           value: {{ .Values.agent.configFilename | default "development" }}
-         - name: AGENT_BIND
-           value: {{ .Values.agent.bind | default "/containerd.sock" }}
-         - name: AGENT_PORT
-           value: {{ .Values.agent.port | default 54192 | quote }}
-         - name: NODE_NAME
-           valueFrom:
-             fieldRef:
-               fieldPath: spec.nodeName
-         - name: AGENT_GRAPH_ROOT
-           value: /graph-root
-        name: agent
-        ports: 
-          - name: http
-            protocol: TCP
-            containerPort: {{ .Values.agent.port | default 54192 }}
-            hostPort: {{ .Values.agent.port | default 54192 }}
+        args: 
+        - --criu-image={{ .Values.image.repository }}/{{ .Values.agent.criuImage }}:{{ .Values.image.tag }}
+        - --runtime={{ .Values.agent.runtime | default "containerd" }}
+        - --containerd-config-path={{ .Values.agent.containerdConfigPath | default "/etc/containerd/config.toml" }}
+        - --containerd-sock={{ .Values.agent.containerdSock | default "/run/containerd/containerd.sock" }}
         securityContext:
-          runAsUser: 0
-          runAsGroup: 0
           privileged: true
-          capabilities:
-            add:
-              - CAP_SYS_ADMIN
-        resources:
-          {{- toYaml .Values.agent.resources | nindent 10 }}
         volumeMounts:
-          - name: containerd
-            mountPath: "/containerd.sock"
-          - name: checkpoints
-            mountPath: "/var/lib/kubelet/checkpoints"
-          - name: graph-root
-            mountPath: /graph-root
+        - mountPath: /host
+          name: hostroot
+        - mountPath: /etc/containerd
+          name: containerd-etc
+        - mountPath: /run/containerd
+          name: containerd-run
+        - mountPath: /opt/checkpoint-shim
+          name: checkpoint-shim-opt
+        - mountPath: /run/systemd
+          name: systemd-run
+        - mountPath: /etc/criu
+          name: criu-etc
+        - name: k3s
+          mountPath: /run/k3s/containerd
+        - name: rancher
+          mountPath: /var/lib/rancher/
+      containers:
+      - name: node
+        image: "{{ .Values.image.repository }}/{{ .Values.agent.nodeImage }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command: ["./node"]
+        args:
+        - --addr={{ .Values.agent.port | default 8090  }}
+        - --debug={{ .Values.agent.debug | default false  }}
+        - --containerd-sock={{ .Values.agent.containerdSock | default "/run/containerd/containerd.sock" }}
+        ports:
+        - containerPort: {{ .Values.agent.port | default 8090 }}
+          name: grpc
+          protocol: TCP
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: DAKR_NODE_SERVICE_ADDR
+          value: "http://localhost:{{ .Values.agent.port | default 8090 }}"
+        resources: 
+          {{ toYaml .Values.agent.resources | nindent 10 }}
+        securityContext:
+          runAsNonRoot: false
+          runAsUser: 0
+          readOnlyRootFilesystem: false
+          privileged: true
+        volumeMounts:
+        - name: dakr-checkpoints
+          mountPath: /var/lib/dakr/checkpoints
+        - name: dakr-run
+          mountPath: /run/dakr
+        - name: var-log-pods
+          mountPath: /var/log/pods
+          readOnly: true
+        - name: containerd-run
+          mountPath: /run/containerd
+        - name: containerd-var-run
+          mountPath: /var/run/containerd
+        - name: k3s
+          mountPath: /run/k3s/containerd
+        - name: rancher
+          mountPath: /var/lib/rancher/
+        # - name: tls-certs
+        #   mountPath: /tls
+        #   readOnly: true
+        livenessProbe:
+          tcpSocket:
+            port: {{ .Values.agent.port | default 8090 }}
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          tcpSocket:
+            port: {{ .Values.agent.port | default 8090 }}
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      - name: pause
+        image: registry.k8s.io/pause:3.9
+        resources:
+          requests:
+            cpu: 1m
+            memory: 1Mi
       volumes:
-        - name: containerd
-          hostPath:
-            path: {{ .Values.agent.containerdSocket | default "/var/run/containerd/containerd.sock" }}
-            # This file is of type Socket, but we want to prevent kubernetes from running checks for it.
-            # From https://kubernetes.io/docs/concepts/storage/volumes/#hostpath: 
-            # "Socket": A UNIX socket must exist at the given path
-            # "": No checks will be performed before mounting the hostPath volume.
-            type: ""
-        - name: checkpoints
-          hostPath:
-            path: /var/lib/kubelet/checkpoints
-            type: ""
-        - name: graph-root
-          emptyDir:
-            sizeLimit: 5Gi
-            medium: "Memory"
-      serviceAccountName: {{ include "dakr.fullname" . }}-agent-sa
-      terminationGracePeriodSeconds: 10
+      - name: hostroot
+        hostPath:
+          path: /
+      - name: k3s
+        hostPath:
+          path: /run/k3s/containerd/
+      - name: rancher
+        hostPath:
+          path: /var/lib/rancher/
+      - name: containerd-etc
+        hostPath:
+          path: /etc/containerd
+      - name: containerd-run
+        hostPath:
+          path: /run/containerd
+      - name: checkpoint-shim-opt
+        hostPath:
+          path: /opt/checkpoint-shim
+      - name: systemd-run
+        hostPath:
+          path: /run/systemd
+      - name: criu-etc
+        hostPath:
+          path: /etc/criu
+      - name: containerd-var-run
+        hostPath:
+          path: /var/run/containerd
+      - name: var-log-pods
+        hostPath:
+          path: /var/log/pods
+      - name: dakr-checkpoints
+        hostPath:
+          path: /var/lib/dakr/checkpoints
+          type: DirectoryOrCreate
+      - name: dakr-run
+        hostPath:
+          path: /run/dakr
+          type: DirectoryOrCreate
+      # - name: tls-certs
+      #   secret:
+      #     secretName: dakr-node-tls
+      #     defaultMode: 0400
 {{- end }}
