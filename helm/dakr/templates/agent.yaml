@@ -24,10 +24,7 @@ spec:
         control-plane: {{ include "dakr.fullname" . }}-agent
     spec:
       serviceAccountName: {{ include "dakr.fullname" . }}-agent
-      hostIPC: true
-      hostNetwork: true
-      hostPID: true
-      dnsPolicy: ClusterFirstWithHostNet
+      dnsPolicy: ClusterFirst
       terminationGracePeriodSeconds: 10
       nodeSelector:
         dakr.devzero.io/checkpoint-node: "true"
@@ -87,6 +84,7 @@ spec:
         - --containerd-sock={{ .Values.agent.containerdSock | default "/run/containerd/containerd.sock" }}
         ports:
         - containerPort: {{ .Values.agent.port | default 8090 }}
+          hostPort: {{ .Values.agent.port | default 8090 }}
           name: grpc
           protocol: TCP
         env:
@@ -98,8 +96,6 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: status.podIP
-        - name: DAKR_NODE_SERVICE_ADDR
-          value: "http://localhost:{{ .Values.agent.port | default 8090 }}"
         resources: 
           {{ toYaml .Values.agent.resources | nindent 10 }}
         securityContext:
