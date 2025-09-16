@@ -81,7 +81,7 @@ operator:
 
 scheduler:
   image:
-    tag: "v0.0.3"
+    tag: "v0.0.4"
   nodeCost:
     controlPlaneAddress: "https://dakr.devzero.io"
     controlPlaneToken: "REPLACE_WITH_TOKEN"
