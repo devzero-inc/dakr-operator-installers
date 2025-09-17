@@ -67,7 +67,7 @@ spec:
       restartPolicy: OnFailure
       containers:
         - name: cert-generator
-          image: bitnami/kubectl:latest
+          image: {{ .Values.image.repository }}/kubectl:latest
           command:
             - /bin/sh
             - -c
@@ -138,7 +138,7 @@ spec:
       restartPolicy: OnFailure
       containers:
         - name: webhook-patcher
-          image: bitnami/kubectl:latest
+          image: {{ .Values.image.repository }}/kubectl:latest
           command:
             - /bin/sh
             - -c
