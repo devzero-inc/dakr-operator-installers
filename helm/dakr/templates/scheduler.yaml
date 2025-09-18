@@ -444,7 +444,7 @@ spec:
         - /usr/local/bin/kube-scheduler
         - --config=/etc/kubernetes/dz-scheduler/dz-scheduler-config.yaml
         - --feature-gates=DynamicResourceAllocation=false
-        image: devzeroinc/dzk8scheduler:{{ .Values.scheduler.image.tag }}
+        image: "{{ .Values.image.repository }}/dzk8scheduler:{{ .Values.scheduler.image.tag }}"
         livenessProbe:
           httpGet:
             path: /healthz
