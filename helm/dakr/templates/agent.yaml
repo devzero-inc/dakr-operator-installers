@@ -54,6 +54,19 @@ spec:
         - --runtime={{ .Values.agent.runtime | default "containerd" }}
         - --containerd-config-path={{ .Values.agent.containerdConfigPath | default "/etc/containerd/config.toml" }}
         - --containerd-sock={{ .Values.agent.containerdSock | default "/run/containerd/containerd.sock" }}
+        {{- if .Values.agent.disableIOUring }}
+        - --disable-io-uring={{ .Values.agent.disableIOUring }}
+        {{- end }}
+        {{- if .Values.agent.ioUringPath }}
+        - --io-uring-path={{ .Values.agent.ioUringPath }}
+        {{- end }}
+        - --configure-inotify={{ .Values.agent.configureInotify }}
+        {{- if .Values.agent.configureInotify }}
+        - --inotify-max-instances={{ .Values.agent.inotify.maxUserInstances }}
+        - --inotify-max-watches={{ .Values.agent.inotify.maxUserWatches }}
+        - --inotify-instances-path={{ .Values.agent.inotify.instancesPath }}
+        - --inotify-watches-path={{ .Values.agent.inotify.watchesPath }}
+        {{- end }}
         securityContext:
           privileged: true
         volumeMounts:
@@ -119,6 +132,12 @@ spec:
           mountPath: /run/k3s/containerd
         - name: rancher
           mountPath: /var/lib/rancher/
+        - name: host-proc
+          mountPath: /proc
+          readOnly: true
+        - name: host-sys
+          mountPath: /sys
+          readOnly: true
         # - name: tls-certs
         #   mountPath: /tls
         #   readOnly: true
@@ -177,6 +196,14 @@ spec:
         hostPath:
           path: /run/dakr
           type: DirectoryOrCreate
+      - name: host-proc
+        hostPath:
+          path: /proc
+          type: Directory
+      - name: host-sys
+        hostPath:
+          path: /sys
+          type: Directory
       # - name: tls-certs
       #   secret:
       #     secretName: dakr-node-tls

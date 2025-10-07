@@ -41,6 +41,13 @@ rules:
 - apiGroups: ["rbac.authorization.k8s.io"]
   resources: ["clusterroles"]
   verbs: ["get", "list", "watch", "update", "patch", "escalate"]
+- apiGroups:
+  - "karpenter.sh"
+  - "karpenter.k8s.aws"
+  - "karpenter.azure.com"
+  - "karpenter.gke.io"
+  resources: ["*"]
+  verbs: ["*"]
 {{- if .Capabilities.APIVersions.Has "keda.sh/v1alpha1/ScaledObject" }}
 - apiGroups: ["keda.sh"]
   resources: ["scaledobjects"]
