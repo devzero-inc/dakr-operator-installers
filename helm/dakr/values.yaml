@@ -10,7 +10,7 @@ image:
   # This sets the pull policy for images.
   pullPolicy: Always 
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "v0.0.28"
+  tag: "v0.0.29"
 
 imagePullSecrets: []
 
@@ -110,6 +110,18 @@ agent:
   # for k3s it is /run/k3s/containerd/containerd.sock
   # for containerd it is /run/containerd/containerd.sock
   containerdSock: "/run/containerd/containerd.sock"
+  # disable io_uring on the node to prevent CRIU checkpoint failures
+  disableIOUring: false
+  # path to the io_uring_disabled sysctl parameter on the host
+  ioUringPath: "/host/proc/sys/kernel/io_uring_disabled"
+  # configure inotify limits for CRIU checkpoint operations
+  configureInotify: true
+  # inotify configuration for CRIU
+  inotify:
+    maxUserInstances: 4096  # Minimum number of inotify instances
+    maxUserWatches: 524288  # Minimum number of inotify watches
+    instancesPath: "/host/proc/sys/fs/inotify/max_user_instances"  # Path to max_user_instances
+    watchesPath: "/host/proc/sys/fs/inotify/max_user_watches"  # Path to max_user_watches
 
 webhook:
   enabled: true
