@@ -4,12 +4,9 @@ Parameters:
   ClusterName:
     Type: String
     Description: "EKS cluster name"
-  AWSRegion:
+  OIDCProviderURL:
     Type: String
-    Description: "The AWS Region of the EKS cluster"
-  OIDCProviderID:
-    Type: String
-    Description: "The ID of the OIDC Provider from your EKS cluster, e.g. C66D5D54749FA6FAF79C0BA97D88327E"
+    Description: "The OIDC Provider URL from your EKS cluster, e.g. https://oidc.eks.us-west-2.amazonaws.com/id/..."
   KarpenterNamespace:
     Type: String
     Default: "kube-system"
@@ -25,12 +22,12 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              Federated: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:oidc-provider/oidc.eks.${AWSRegion}.amazonaws.com/id/${OIDCProviderID}"
+              Federated: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:oidc-provider/${!Select [1, !Split ['https://', !Ref OIDCProviderURL]]}"
             Action: "sts:AssumeRoleWithWebIdentity"
             Condition:
               StringEquals:
-                !Sub "oidc.eks.${AWSRegion}.amazonaws.com/id/${OIDCProviderID}:aud": "sts.amazonaws.com"
-                !Sub "oidc.eks.${AWSRegion}.amazonaws.com/id/${OIDCProviderID}:sub": !Sub "system:serviceaccount:${KarpenterNamespace}:karpenter"
+                "${!Select [1, !Split ['https://', !Ref OIDCProviderURL]]}:aud": "sts.amazonaws.com"
+                "${!Select [1, !Split ['https://', !Ref OIDCProviderURL]]}:sub": !Sub "system:serviceaccount:${KarpenterNamespace}:karpenter"
       ManagedPolicyArns:
         - !Ref KarpenterControllerPolicy
   KarpenterNodeRole:
