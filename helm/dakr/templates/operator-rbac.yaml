@@ -66,6 +66,14 @@ rules:
   resources: ["rollouts/status"]
   verbs: ["get", "update", "patch"]
 {{- end }}
+{{- if .Capabilities.APIVersions.Has "kubeflow.org/v1/Notebook" }}
+- apiGroups: ["kubeflow.org"]
+  resources: ["notebooks"]
+  verbs: ["get", "list", "watch", "update", "patch"]
+- apiGroups: ["kubeflow.org"]
+  resources: ["notebooks/status"]
+  verbs: ["get", "update", "patch"]
+{{- end }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
