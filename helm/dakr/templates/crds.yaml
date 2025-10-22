@@ -144,6 +144,10 @@ spec:
                     failedAt:
                       format: date-time
                       type: string
+                    failureReason:
+                      description: FailureReason provides details about why the restore
+                        failed
+                      type: string
                     name:
                       type: string
                     restoreDuration:
@@ -623,6 +627,14 @@ spec:
                     type: object
                 type: object
                 x-kubernetes-map-type: atomic
+              liveMigDeletionProp:
+                description: LiveMigDeletionProp is set for when UseLiveMigration:true
+                  and indicates how the snapshotted container should be handled.
+                enum:
+                - Orphaned
+                - Foreground
+                - Background
+                type: string
               name:
                 description: Name is the name of the target workload
                 type: string

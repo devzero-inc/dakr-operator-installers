@@ -95,6 +95,7 @@ spec:
         - --addr={{ .Values.agent.port | default 8090  }}
         - --debug={{ .Values.agent.debug | default false  }}
         - --containerd-sock={{ .Values.agent.containerdSock | default "/run/containerd/containerd.sock" }}
+        - --checkpoint-kubelet-logs={{ .Values.agent.checkpointKubeletLogs | default true }}
         ports:
         - containerPort: {{ .Values.agent.port | default 8090 }}
           hostPort: {{ .Values.agent.port | default 8090 }}
