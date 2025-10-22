@@ -10,7 +10,7 @@ image:
   # This sets the pull policy for images.
   pullPolicy: Always 
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "v0.0.31"
+  tag: "v0.0.32"
 
 imagePullSecrets: []
 
@@ -19,9 +19,6 @@ operator:
   image: dakr-operator
   replicas: 3
   resources:
-    limits:
-      cpu: 500m
-      memory: 128Mi
     requests:
       cpu: 10m
       memory: 64Mi
@@ -47,7 +44,10 @@ operator:
   features:
     argocdPatching: false # if set, the operator will patch argo applications to ignore differences from the dakr operator
     workloadRecBatchSize: 1 # needs to be >=1; determines batch size of pulling down workload recommendations from control plane, before being persisted as CRDs 
-    nodeGroupRecBatchSize: 1 # needs to be >=1; determines batch size of pulling down node group recommendations from control plane, before being persisted as CRDs 
+    nodeGroupRecBatchSize: 1 # needs to be >=1; determines batch size of pulling down node group recommendations from control plane, before being persisted as CRDs
+  # Runtime directories to include in live migration checkpoint operations
+  # These directories will be passed to the live migration service for CRIU checkpoint operations
+  runtimeDirs: []
   serviceAccount:
     name: "dakr-operator-sa"
     # Annotations for cloud provider IAM integration.
@@ -100,6 +100,8 @@ agent:
       cpu: 100m
       memory: 128Mi
   runtime: "containerd" # containerd/k3s/rke2
+  # control whether to checkpoint and restore kubelet logs (default: false)
+  checkpointKubeletLogs: true
   # this is the path to the containerd config file
   # for rke2 it is /var/lib/rancher/rke2/agent/etc/containerd/config.toml
   # for k3s it is /var/lib/rancher/k3s/agent/etc/containerd/config.toml

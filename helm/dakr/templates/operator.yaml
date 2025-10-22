@@ -66,6 +66,9 @@ spec:
           - --argocd-patching={{ .Values.operator.features.argocdPatching | default false }}
           - --workload-rec-batch-size={{ .Values.operator.features.workloadRecBatchSize | default 1 }}
           - --node-group-rec-batch-size={{ .Values.operator.features.nodeGroupRecBatchSize | default 1 }}
+          {{- range .Values.operator.runtimeDirs }}
+          - --runtime-dir={{ . }}
+          {{- end }}
           - --leader-election={{ include "dakr.leaderElection" . }}
           - --leader-election-namespace={{ .Release.Namespace }}
           - --service-account-name=system:serviceaccount:{{ .Release.Namespace }}:{{ .Values.operator.serviceAccount.name }}
