@@ -1,0 +1,31 @@
+{{- if and .Values.runtimeConfig.enabled .Values.runtimeConfig.registryMirrors.enabled }}
+{{- range .Values.runtimeConfig.registryMirrors.registries }}
+{{- if .enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "dakr.fullname" $ }}-registry-{{ .name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "dakr.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: registry-{{ .name }}
+spec:
+  type: NodePort
+  ports:
+  - port: {{ $.Values.runtimeConfig.registryMirrors.service.registryPort }}
+    targetPort: {{ $.Values.runtimeConfig.registryMirrors.service.registryPort }}
+    nodePort: {{ $.Values.runtimeConfig.registryMirrors.service.nodePort }}
+    protocol: TCP
+    name: registry
+  - port: {{ $.Values.runtimeConfig.registryMirrors.service.registryDebugPort }}
+    targetPort: {{ $.Values.runtimeConfig.registryMirrors.service.registryDebugPort }}
+    nodePort: {{ $.Values.runtimeConfig.registryMirrors.service.nodeDebugPort }}
+    protocol: TCP
+    name: debug
+  selector:
+    {{- include "dakr.selectorLabels" $ | nindent 4 }}
+    app.kubernetes.io/component: registry-{{ .name }}
+{{- end }}
+{{- end }}
+{{- end }}
