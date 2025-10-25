@@ -128,3 +128,146 @@ agent:
 webhook:
   enabled: true
   caBundle: ""  # Base64 encoded CA bundle for webhook
+
+# Runtime Configuration
+# Modular tool for configuring container runtimes (containerd, CRI-O, Docker, etc.)
+# Includes registry mirror configuration, and can be extended with storage, network, security modules
+runtimeConfig:
+  enabled: false  # Set to true to enable runtime configuration
+  image: dakr-runtime-config
+
+  # Container runtime to configure
+  runtime: containerd  # containerd, cri-o (future), docker (future)
+
+  # Runtime-specific paths
+  runtimeConfigPath: /etc/containerd/config.toml
+  runtimeSocket: /run/containerd/containerd.sock
+
+  # Configuration modules to apply
+  # Available modules: registry, storage (future), network (future), security (future)
+  modules:
+    - registry
+
+  # Timeout for configuration operations
+  timeout: 2m
+
+  # Node targeting
+  nodeSelector:
+    mode: all  # "all" or "labeled"
+    # When mode=labeled, specify labels to match
+    labels: {}
+    # Example:
+    # labels:
+    #   dakr.devzero.io/runtime-config: "true"
+
+  # Tolerations to allow running on all nodes
+  tolerations:
+    - effect: NoSchedule
+      operator: Exists
+
+  # Registry Mirror Module Configuration
+  # Pull-through cache for accelerating image pulls
+  registryMirrors:
+    enabled: true  # Set to true to enable registry mirror deployment
+
+    # Service configuration for registry StatefulSets
+    service:
+      registryPort: 5000
+      registryDebugPort: 5001
+      nodePort: 30500  # Port on the node to expose the registry service
+      nodeDebugPort: 30501  # Port on the node to expose the registry debug service
+
+    # Global settings for all registry StatefulSets
+    persistence:
+      enabled: false  # Set to true to use PersistentVolumes (recommended for production)
+      storageClass: ""  # Leave empty to use default storage class
+      size: 20Gi  # Size per registry
+
+    # Resource limits per registry pod
+    resources:
+      requests:
+        cpu: 10m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 256Mi
+
+    # Registry mirror definitions
+    registries:
+      # Docker Hub (docker.io)
+      - name: dockerhub
+        enabled: true
+        upstream: "https://registry-1.docker.io"
+        ttl: 168h # 7 days
+        # These are the registry hostnames that will be mirrored
+        mirrorFor:
+          - "docker.io"
+          - "index.docker.io"
+        # Optional: Docker Hub credentials for higher rate limits
+        credentials:
+          username: ""
+          password: ""
+          # Alternative: use existing secret
+          # usernameSecret:
+          #   name: dockerhub-creds
+          #   key: username
+          # passwordSecret:
+          #   name: dockerhub-creds
+          #   key: password
+
+      # GitHub Container Registry
+      - name: ghcr
+        enabled: false
+        upstream: "https://ghcr.io"
+        ttl: 168h # 7 days
+        mirrorFor:
+          - "ghcr.io"
+        credentials:
+          username: ""
+          password: ""
+
+      # Google Container Registry
+      - name: gcr
+        enabled: false
+        upstream: "https://gcr.io"
+        ttl: 168h # 7 days
+        mirrorFor:
+          - "gcr.io"
+        credentials:
+          username: ""
+          password: ""
+
+      # Google Artifact Registry
+      - name: gar
+        enabled: false
+        upstream: "https://us-docker.pkg.dev"
+        ttl: 168h # 7 days
+        mirrorFor:
+          - "us-docker.pkg.dev"
+          - "europe-docker.pkg.dev"
+          - "asia-docker.pkg.dev"
+        credentials:
+          username: ""
+          password: ""
+
+      # Quay.io
+      - name: quay
+        enabled: false
+        upstream: "https://quay.io"
+        ttl: 168h # 7 days
+        mirrorFor:
+          - "quay.io"
+        credentials:
+          username: ""
+          password: ""
+
+      # AWS ECR Public
+      - name: ecrpublic
+        enabled: false
+        upstream: "https://public.ecr.aws"
+        ttl: 168h # 7 days
+        mirrorFor:
+          - "public.ecr.aws"
+        credentials:
+          username: ""
+          password: ""

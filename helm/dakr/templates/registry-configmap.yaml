@@ -1,0 +1,50 @@
+{{- if and .Values.runtimeConfig.enabled .Values.runtimeConfig.registryMirrors.enabled }}
+{{- range .Values.runtimeConfig.registryMirrors.registries }}
+{{- if .enabled }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "dakr.fullname" $ }}-registry-{{ .name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "dakr.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: registry-{{ .name }}
+data:
+  config.yml: |
+    version: 0.1
+    log:
+      level: info
+      fields:
+        service: registry
+    storage:
+      delete:
+        enabled: true
+      cache:
+        blobdescriptor: inmemory
+      filesystem:
+        rootdirectory: /var/lib/registry
+    http:
+      addr: :{{ $.Values.runtimeConfig.registryMirrors.service.registryPort }}
+      headers:
+        X-Content-Type-Options: [nosniff]
+      debug:
+        addr: :{{ $.Values.runtimeConfig.registryMirrors.service.registryDebugPort }}
+        prometheus:
+          enabled: true
+          path: /metrics
+    health:
+      storagedriver:
+        enabled: true
+        interval: 10s
+        threshold: 3
+    proxy:
+      remoteurl: {{ .upstream }}
+      {{- if or .credentials.username .credentials.usernameSecret }}
+      username: {{ .credentials.username | default "will-be-replaced-by-env" }}
+      password: {{ .credentials.password | default "will-be-replaced-by-env" }}
+      {{- end }}
+      ttl: {{ .ttl }}
+{{- end }}
+{{- end }}
+{{- end }}

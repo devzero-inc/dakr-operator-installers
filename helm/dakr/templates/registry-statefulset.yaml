@@ -1,0 +1,103 @@
+{{- if and .Values.runtimeConfig.enabled .Values.runtimeConfig.registryMirrors.enabled }}
+{{- range .Values.runtimeConfig.registryMirrors.registries }}
+{{- if .enabled }}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "dakr.fullname" $ }}-registry-{{ .name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "dakr.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: registry-{{ .name }}
+spec:
+  serviceName: {{ include "dakr.fullname" $ }}-registry-{{ .name }}
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "dakr.selectorLabels" $ | nindent 6 }}
+      app.kubernetes.io/component: registry-{{ .name }}
+  template:
+    metadata:
+      labels:
+        {{- include "dakr.selectorLabels" $ | nindent 8 }}
+        app.kubernetes.io/component: registry-{{ .name }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/registry-configmap.yaml") $ | sha256sum }}
+    spec:
+      containers:
+      - name: registry
+        image: registry:2.8.3
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: {{ $.Values.runtimeConfig.registryMirrors.service.registryPort }}
+          name: registry
+          protocol: TCP
+        - containerPort: {{ $.Values.runtimeConfig.registryMirrors.service.registryDebugPort }}
+          name: debug
+          protocol: TCP
+        env:
+        {{- if or .credentials.username .credentials.usernameSecret }}
+        - name: REGISTRY_PROXY_USERNAME
+          {{- if .credentials.usernameSecret }}
+          valueFrom:
+            secretKeyRef:
+              name: {{ .credentials.usernameSecret.name }}
+              key: {{ .credentials.usernameSecret.key }}
+          {{- else }}
+          value: {{ .credentials.username | quote }}
+          {{- end }}
+        - name: REGISTRY_PROXY_PASSWORD
+          {{- if .credentials.passwordSecret }}
+          valueFrom:
+            secretKeyRef:
+              name: {{ .credentials.passwordSecret.name }}
+              key: {{ .credentials.passwordSecret.key }}
+          {{- else }}
+          value: {{ .credentials.password | quote }}
+          {{- end }}
+        {{- end }}
+        volumeMounts:
+        - name: config
+          mountPath: /etc/docker/registry
+          readOnly: true
+        - name: data
+          mountPath: /var/lib/registry
+        resources:
+          {{- toYaml $.Values.runtimeConfig.registryMirrors.resources | nindent 10 }}
+        livenessProbe:
+          httpGet:
+            path: /
+            port: {{ $.Values.runtimeConfig.registryMirrors.service.registryPort }}
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: {{ $.Values.runtimeConfig.registryMirrors.service.registryPort }}
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: config
+        configMap:
+          name: {{ include "dakr.fullname" $ }}-registry-{{ .name }}
+      {{- if not $.Values.runtimeConfig.registryMirrors.persistence.enabled }}
+      - name: data
+        emptyDir: {}
+      {{- end }}
+  {{- if $.Values.runtimeConfig.registryMirrors.persistence.enabled }}
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      {{- if $.Values.runtimeConfig.registryMirrors.persistence.storageClass }}
+      storageClassName: {{ $.Values.runtimeConfig.registryMirrors.persistence.storageClass | quote }}
+      {{- end }}
+      resources:
+        requests:
+          storage: {{ $.Values.runtimeConfig.registryMirrors.persistence.size }}
+  {{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
