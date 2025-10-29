@@ -1,0 +1,68 @@
+{{- if and .Values.runtimeConfig.enabled .Values.runtimeConfig.registryMirrors.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "dakr.fullname" . }}-zot-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "dakr.labels" . | nindent 4 }}
+    app.kubernetes.io/component: zot-registry
+data:
+  config.json: |
+    {
+      "distSpecVersion": "1.1.0",
+      "storage": {
+        "rootDirectory": "/var/lib/registry",
+        "dedupe": true,
+        "gc": true,
+        "gcDelay": "1h",
+        "gcInterval": "24h"
+      },
+      "http": {
+        "address": "0.0.0.0",
+        "port": "{{ $.Values.runtimeConfig.registryMirrors.service.registryPort }}"
+      },
+      "log": {
+        "level": "info"
+      },
+      "extensions": {
+        "sync": {
+          "enable": true,
+          "registries": [
+            {{- $registries := list }}
+            {{- range .Values.runtimeConfig.registryMirrors.registries }}
+            {{- if .enabled }}
+            {{- $registries = append $registries . }}
+            {{- end }}
+            {{- end }}
+            {{- range $index, $registry := $registries }}
+            {
+              "urls": ["{{ $registry.upstream }}"],
+              {{- if and $registry.credentials (or $registry.credentials.username $registry.credentials.password) }}
+              "username": "{{ $registry.credentials.username | default "" }}",
+              "password": "{{ $registry.credentials.password | default "" }}",
+              {{- end }}
+              "content": [
+                {
+                  "prefix": "**",
+                  "destination": "/{{ $registry.name }}",
+                  "stripPrefix": false
+                }
+              ],
+              "onDemand": true,
+              "tlsVerify": true,
+              "maxRetries": 3,
+              "retryDelay": "5m"
+            }{{- if ne (add1 $index) (len $registries) }},{{- end }}
+            {{- end }}
+          ]
+        },
+        "metrics": {
+          "enable": true,
+          "prometheus": {
+            "path": "/metrics"
+          }
+        }
+      }
+    }
+{{- end }}

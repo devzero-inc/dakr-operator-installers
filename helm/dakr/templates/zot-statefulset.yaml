@@ -1,0 +1,77 @@
+{{- if and .Values.runtimeConfig.enabled .Values.runtimeConfig.registryMirrors.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "dakr.fullname" . }}-zot
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "dakr.labels" . | nindent 4 }}
+    app.kubernetes.io/component: zot-registry
+spec:
+  serviceName: {{ include "dakr.fullname" . }}-zot
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "dakr.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: zot-registry
+  template:
+    metadata:
+      labels:
+        {{- include "dakr.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: zot-registry
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/zot-configmap.yaml") . | sha256sum }}
+    spec:
+      containers:
+      - name: zot
+        image: ghcr.io/project-zot/zot-linux-amd64:{{ .Values.runtimeConfig.registryMirrors.zot.tag | default "v2.1.1" }}
+        imagePullPolicy: IfNotPresent
+        args:
+        - serve
+        - /etc/zot/config.json
+        ports:
+        - containerPort: {{ .Values.runtimeConfig.registryMirrors.service.registryPort }}
+          name: registry
+          protocol: TCP
+        volumeMounts:
+        - name: config
+          mountPath: /etc/zot
+          readOnly: true
+        - name: data
+          mountPath: /var/lib/registry
+        resources:
+          {{- toYaml .Values.runtimeConfig.registryMirrors.resources | nindent 10 }}
+        livenessProbe:
+          httpGet:
+            path: /v2/
+            port: {{ .Values.runtimeConfig.registryMirrors.service.registryPort }}
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /v2/
+            port: {{ .Values.runtimeConfig.registryMirrors.service.registryPort }}
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: config
+        configMap:
+          name: {{ include "dakr.fullname" . }}-zot-config
+      {{- if not .Values.runtimeConfig.registryMirrors.persistence.enabled }}
+      - name: data
+        emptyDir: {}
+      {{- end }}
+  {{- if .Values.runtimeConfig.registryMirrors.persistence.enabled }}
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      {{- if .Values.runtimeConfig.registryMirrors.persistence.storageClass }}
+      storageClassName: {{ .Values.runtimeConfig.registryMirrors.persistence.storageClass | quote }}
+      {{- end }}
+      resources:
+        requests:
+          storage: {{ .Values.runtimeConfig.registryMirrors.persistence.size }}
+  {{- end }}
+{{- end }}
