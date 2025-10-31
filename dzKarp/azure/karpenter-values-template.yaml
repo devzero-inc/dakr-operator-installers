@@ -23,6 +23,8 @@ controller:
       value: ${NETWORK_PLUGIN_MODE}
     - name: NETWORK_POLICY
       value: ${NETWORK_POLICY}
+    - name: NETWORK_DATAPLANE
+      value: ""
     - name: VNET_SUBNET_ID
       value: ${VNET_SUBNET_ID}
     - name: VNET_GUID
