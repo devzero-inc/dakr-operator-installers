@@ -1,0 +1,21 @@
+{{- if and .Values.runtimeConfig.enabled .Values.runtimeConfig.registryMirrors.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "dakr.fullname" . }}-zot
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "dakr.labels" . | nindent 4 }}
+    app.kubernetes.io/component: zot-registry
+spec:
+  type: NodePort
+  ports:
+  - port: {{ .Values.runtimeConfig.registryMirrors.service.registryPort }}
+    targetPort: {{ .Values.runtimeConfig.registryMirrors.service.registryPort }}
+    nodePort: {{ .Values.runtimeConfig.registryMirrors.service.nodePort }}
+    protocol: TCP
+    name: registry
+  selector:
+    {{- include "dakr.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: zot-registry
+{{- end }}
