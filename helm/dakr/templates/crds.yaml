@@ -99,6 +99,10 @@ spec:
                 description: Reason for the checkpoint (e.g., "DeploymentUpdate",
                   "ResourceUpdate")
                 type: string
+              recommendationId:
+                description: RecommendationID is the unique identifier from the dakr
+                  service
+                type: string
               sourceNode:
                 description: SourceNode where the checkpoint was created
                 type: string
@@ -346,6 +350,7 @@ spec:
                 - Applied
                 - Failed
                 - Skipped
+                - Migrating
                 type: string
             type: object
         type: object
@@ -381,6 +386,9 @@ spec:
       type: string
     - jsonPath: .spec.actionTriggers
       name: Action
+      type: string
+    - jsonPath: .spec.useLiveMigration
+      name: LiveMigration
       type: string
     - jsonPath: .spec.schedulerName
       name: Scheduler
@@ -757,6 +765,7 @@ spec:
                 - Applied
                 - Failed
                 - Skipped
+                - Migrating
                 type: string
             type: object
         type: object

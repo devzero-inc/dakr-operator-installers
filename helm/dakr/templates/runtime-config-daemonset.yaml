@@ -1,0 +1,84 @@
+{{- if .Values.runtimeConfig.enabled }}
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "dakr.fullname" . }}-runtime-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "dakr.labels" . | nindent 4 }}
+    app.kubernetes.io/component: runtime-config
+spec:
+  selector:
+    matchLabels:
+      {{- include "dakr.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: runtime-config
+  template:
+    metadata:
+      annotations:
+        {{- if and .Values.runtimeConfig.enabled .Values.runtimeConfig.registryMirrors.enabled }}
+        checksum/config: {{ include (print $.Template.BasePath "/zot-configmap.yaml") $ | sha256sum }}
+        {{- end }}
+      labels:
+        {{- include "dakr.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: runtime-config
+    spec:
+      serviceAccountName: {{ include "dakr.fullname" . }}-runtime-config
+      {{- if eq .Values.runtimeConfig.nodeSelector.mode "labeled" }}
+      nodeSelector:
+        {{- toYaml .Values.runtimeConfig.nodeSelector.labels | nindent 8 }}
+      {{- end }}
+      {{- with .Values.runtimeConfig.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+      - name: runtime-config
+        image: "{{ .Values.image.repository }}/{{ .Values.runtimeConfig.image }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        args:
+        - --runtime={{ .Values.runtimeConfig.runtime }}
+        - --runtime-config-path={{ .Values.runtimeConfig.runtimeConfigPath }}
+        - --runtime-socket={{ .Values.runtimeConfig.runtimeSocket }}
+        - --host-root=/host
+        - --modules={{ .Values.runtimeConfig.modules | join "," }}
+        {{- if and .Values.runtimeConfig.registryMirrors.enabled (has "registry" .Values.runtimeConfig.modules) }}
+        {{- range .Values.runtimeConfig.registryMirrors.registries }}
+        {{- if .enabled }}
+        {{- $upstream := .upstream }}
+        {{- $registryName := .name }}
+        {{- range .mirrorFor }}
+        - --registry-mirror={{ . }}|http://127.0.0.1:{{ $.Values.runtimeConfig.registryMirrors.service.nodePort }}/v2/{{ $registryName }}|{{ $upstream }}
+        {{- end }}
+        {{- end }}
+        {{- end }}
+        {{- end }}
+        - --mode=configure
+        - --timeout={{ .Values.runtimeConfig.timeout }}
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - name: host
+          mountPath: /host
+        - name: runtime-config
+          mountPath: {{ dir .Values.runtimeConfig.runtimeConfigPath }}
+        - name: runtime-socket
+          mountPath: {{ dir .Values.runtimeConfig.runtimeSocket }}
+      containers:
+      # Pause container to keep DaemonSet running
+      - name: pause
+        image: registry.k8s.io/pause:3.9
+        resources:
+          requests:
+            cpu: 1m
+            memory: 1Mi
+      volumes:
+      - name: host
+        hostPath:
+          path: /
+      - name: runtime-config
+        hostPath:
+          path: {{ dir .Values.runtimeConfig.runtimeConfigPath }}
+      - name: runtime-socket
+        hostPath:
+          path: {{ dir .Values.runtimeConfig.runtimeSocket }}
+{{- end }}
