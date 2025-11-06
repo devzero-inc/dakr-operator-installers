@@ -21,6 +21,9 @@ spec:
         app.kubernetes.io/component: zot-registry
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/zot-configmap.yaml") . | sha256sum }}
+        {{- if not .Values.runtimeConfig.registryMirrors.credentialsSecret.existingSecret }}
+        checksum/credentials: {{ include (print $.Template.BasePath "/zot-credentials-secret.yaml") . | sha256sum }}
+        {{- end }}
     spec:
       containers:
       - name: zot
@@ -39,6 +42,18 @@ spec:
           readOnly: true
         - name: data
           mountPath: /var/lib/registry
+        {{- /* Mount credentials if any registry has credentials */ -}}
+        {{- $hasCredentials := false -}}
+        {{- range .Values.runtimeConfig.registryMirrors.registries -}}
+          {{- if and .enabled .credentials (or .credentials.username .credentials.password) -}}
+            {{- $hasCredentials = true -}}
+          {{- end -}}
+        {{- end -}}
+        {{- if $hasCredentials }}
+        - name: credentials
+          mountPath: /etc/zot/credentials
+          readOnly: true
+        {{- end }}
         resources:
           {{- toYaml .Values.runtimeConfig.registryMirrors.resources | nindent 10 }}
         livenessProbe:
@@ -57,6 +72,22 @@ spec:
       - name: config
         configMap:
           name: {{ include "dakr.fullname" . }}-zot-config
+      {{- /* Add credentials volume if any registry has credentials */ -}}
+      {{- $hasCredentials := false -}}
+      {{- range .Values.runtimeConfig.registryMirrors.registries -}}
+        {{- if and .enabled .credentials (or .credentials.username .credentials.password) -}}
+          {{- $hasCredentials = true -}}
+        {{- end -}}
+      {{- end -}}
+      {{- if $hasCredentials }}
+      - name: credentials
+        secret:
+          {{- if .Values.runtimeConfig.registryMirrors.credentialsSecret.existingSecret }}
+          secretName: {{ .Values.runtimeConfig.registryMirrors.credentialsSecret.existingSecret }}
+          {{- else }}
+          secretName: {{ include "dakr.fullname" . }}-zot-credentials
+          {{- end }}
+      {{- end }}
       {{- if not .Values.runtimeConfig.registryMirrors.persistence.enabled }}
       - name: data
         emptyDir: {}
