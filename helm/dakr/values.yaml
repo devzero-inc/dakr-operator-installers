@@ -10,7 +10,7 @@ image:
   # This sets the pull policy for images.
   pullPolicy: Always 
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "v0.0.33"
+  tag: "v0.0.34"
 
 imagePullSecrets: []
 
@@ -174,6 +174,7 @@ runtimeConfig:
     # Zot-specific configuration
     zot:
       tag: "v2.1.10"  # Zot image tag
+      logLevel: "info"  # Log level for Zot registry. Options: debug, info, warn, error
 
     # Service configuration for Zot registry
     service:
@@ -195,13 +196,20 @@ runtimeConfig:
         cpu: 100m
         memory: 256Mi
 
+    # Credentials Secret Configuration
+    # Credentials are automatically generated from registry credentials below
+    # Or you can provide your own secret with credentials.json
+    credentialsSecret:
+      existingSecret: ""  # Set to use existing secret instead of auto-generated one
+      key: "credentials.json"  # Key in the secret containing credentials.json
+
     # Registry mirror definitions
     registries:
       # Docker Hub (docker.io)
       - name: dockerhub
         enabled: false
         upstream: "https://registry-1.docker.io"
-        ttl: 168h # 7 days
+        ttl: "168h" # 7 days
         # These are the registry hostnames that will be mirrored
         mirrorFor:
           - "docker.io"
@@ -214,7 +222,7 @@ runtimeConfig:
       # - name: ghcr
       #   enabled: false
       #   upstream: "https://ghcr.io"
-      #   ttl: 168h # 7 days
+      #   ttl: "168h" # 7 days
       #   mirrorFor:
       #     - "ghcr.io"
       #   # credentials:
@@ -225,7 +233,7 @@ runtimeConfig:
       # - name: gcr
       #   enabled: false
       #   upstream: "https://gcr.io"
-      #   ttl: 168h # 7 days
+      #   ttl: "168h" # 7 days
       #   mirrorFor:
       #     - "gcr.io"
       #   credentials:
@@ -236,7 +244,7 @@ runtimeConfig:
       # - name: gar
       #   enabled: false
       #   upstream: "https://us-docker.pkg.dev"
-      #   ttl: 168h # 7 days
+      #   ttl: "168h" # 7 days
       #   mirrorFor:
       #     - "us-docker.pkg.dev"
       #     - "europe-docker.pkg.dev"
@@ -249,7 +257,7 @@ runtimeConfig:
       # - name: quay
       #   enabled: false
       #   upstream: "https://quay.io"
-      #   ttl: 168h # 7 days
+      #   ttl: "168h" # 7 days
       #   mirrorFor:
       #     - "quay.io"
       #   credentials:
@@ -260,9 +268,19 @@ runtimeConfig:
       # - name: ecrpublic
       #   enabled: false
       #   upstream: "https://public.ecr.aws"
-      #   ttl: 168h # 7 days
+      #   ttl: "168h" # 7 days
       #   mirrorFor:
       #     - "public.ecr.aws"
       #   credentials:
       #     username: ""
       #     password: ""
+
+      # # AWS ECR Private Registry
+      # # Uses native credentialHelper for authentication (no username/password needed)
+      # - name: ecrprivate
+      #   enabled: true
+      #   upstream: "https://ACCOUNTID.dkr.ecr.REGION.amazonaws.com"
+      #   ttl: "168h"
+      #   mirrorFor:
+      #     - "https://ACCOUNTID.dkr.ecr.REGION.amazonaws.com"
+      #   credentialHelper: "ecr"

@@ -23,11 +23,25 @@ data:
         "port": "{{ $.Values.runtimeConfig.registryMirrors.service.registryPort }}"
       },
       "log": {
-        "level": "info"
+        "level": "{{ $.Values.runtimeConfig.registryMirrors.zot.logLevel | default "info" }}"
       },
       "extensions": {
         "sync": {
           "enable": true,
+          {{- /* Add credentialsFile if any registry has credentials */ -}}
+          {{- $hasCredentials := false -}}
+          {{- range .Values.runtimeConfig.registryMirrors.registries -}}
+            {{- if and .enabled .credentials (or .credentials.username .credentials.password) -}}
+              {{- $hasCredentials = true -}}
+            {{- end -}}
+          {{- end -}}
+          {{- if $hasCredentials }}
+          {{- if .Values.runtimeConfig.registryMirrors.credentialsSecret.existingSecret }}
+          "credentialsFile": "/etc/zot/credentials/{{ .Values.runtimeConfig.registryMirrors.credentialsSecret.key }}",
+          {{- else }}
+          "credentialsFile": "/etc/zot/credentials/credentials.json",
+          {{- end }}
+          {{- end }}
           "registries": [
             {{- $registries := list }}
             {{- range .Values.runtimeConfig.registryMirrors.registries }}
@@ -38,9 +52,8 @@ data:
             {{- range $index, $registry := $registries }}
             {
               "urls": ["{{ $registry.upstream }}"],
-              {{- if and $registry.credentials (or $registry.credentials.username $registry.credentials.password) }}
-              "username": "{{ $registry.credentials.username | default "" }}",
-              "password": "{{ $registry.credentials.password | default "" }}",
+              {{- if $registry.credentialHelper }}
+              "credentialHelper": "{{ $registry.credentialHelper }}",
               {{- end }}
               "content": [
                 {
@@ -50,9 +63,7 @@ data:
                 }
               ],
               "onDemand": true,
-              "tlsVerify": true,
-              "maxRetries": 3,
-              "retryDelay": "5m"
+              "tlsVerify": true
             }{{- if ne (add1 $index) (len $registries) }},{{- end }}
             {{- end }}
           ]
