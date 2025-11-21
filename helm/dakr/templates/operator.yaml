@@ -64,6 +64,7 @@ spec:
           - --cluster-location={{ .Values.operator.clusterLocation }}
           - --debug-http-addr=:{{ .Values.operator.debugPort | default 8082 }}
           - --argocd-patching={{ .Values.operator.features.argocdPatching | default false }}
+          - --has-argo={{ .Capabilities.APIVersions.Has "argoproj.io/v1alpha1/Application" }}
           - --workload-rec-batch-size={{ .Values.operator.features.workloadRecBatchSize | default 1 }}
           - --node-group-rec-batch-size={{ .Values.operator.features.nodeGroupRecBatchSize | default 1 }}
           {{- range .Values.operator.runtimeDirs }}
