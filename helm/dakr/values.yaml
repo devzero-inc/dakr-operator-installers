@@ -10,7 +10,7 @@ image:
   # This sets the pull policy for images.
   pullPolicy: Always 
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "v0.0.36"
+  tag: "v0.0.37"
 
 imagePullSecrets: []
 
@@ -18,23 +18,34 @@ operator:
   enabled: true
   image: dakr-operator
   replicas: 3
+  # IMPORTANT: When using Secrets for token configuration, note that Secrets cannot be accessed across namespaces.
+  # If zxporter is installed in devzero-zxporter namespace by default, you have two options:
+  # 1. Install dakr in the same namespace as zxporter (devzero-zxporter)
+  # 2. Copy/recreate the Secret from devzero-zxporter namespace to the dakr operator's namespace
+  # ConfigMaps can be accessed across namespaces and don't have this limitation.
   resources:
     requests:
       cpu: 10m
       memory: 64Mi
   endpoint: "https://dakr.devzero.io"
   logLevel: "info"
-  clusterToken: "REPLACE_WITH_TOKEN" # If this is empty, the operator will attempt to read from the ConfigMap below.
+  clusterToken: "REPLACE_WITH_TOKEN" # If this is empty, the operator will attempt to read from Secret or ConfigMap below.
                    # If set to a non-empty string, this value will be used directly.
   clusterName: "REPLACE_WITH_CLUSTER_NAME" # If this is empty, the operator will attempt to read from the ConfigMap below.
                   # If set to a non-empty string, this value will be used directly.
   clusterLocation: "REPLACE_WITH_CLUSTER_LOCATION"  # usually the cloud region code for where the cluster is running, can also be the zone if the cluster is zonal
   # noCloudCreds: true # If true, operator will not attempt to perform node scaling operations, and will not require cloud credentials
-  # tokenFromConfigMap: # If clusterToken is not specified above, operator will read from below ConfigMap value
+  # tokenFromSecret: # If clusterToken is not specified above, operator will read from below Secret value (higher priority than ConfigMap)
+  #   name: "devzero-zxporter-token"      # Name of the Secret (must be in the same namespace as the operator)
+  #   key: "CLUSTER_TOKEN"                # Key in the Secret's data to get the token
+  #   # NOTE: This matches the Secret created by zxporter. Secrets cannot be accessed across namespaces.
+  #   # If zxporter is installed in devzero-zxporter namespace and dakr operator is installed in a different namespace,
+  #   # the Secret must be recreated in the operator's namespace. Alternatively, install both in the same namespace.
+  # tokenFromConfigMap: # If clusterToken is not specified above and not found in Secret, operator will read from below ConfigMap value
   #   name: "devzero-zxporter-env-config" # Name of the ConfigMap
   #   namespace: "devzero-zxporter"       # Namespace of the ConfigMap
   #   key: "CLUSTER_TOKEN"                # Key in the ConfigMap's data to get the token
-  # nameFromConfigMap: # If clusterName is not specified above, operator will read from below ConfigMap value
+  # nameFromConfigMap: # If clusterName is not specified above and not found in Secret, operator will read from below ConfigMap value
   #   name: "devzero-zxporter-env-config" # Name of the ConfigMap
   #   namespace: "devzero-zxporter"       # Namespace of the ConfigMap
   #   key: "KUBE_CONTEXT_NAME"            # Key in the ConfigMap's data to get the cluster name from
@@ -48,6 +59,12 @@ operator:
   # Runtime directories to include in live migration checkpoint operations
   # These directories will be passed to the live migration service for CRIU checkpoint operations
   runtimeDirs: []
+  # Janitor configuration for periodic cleanup of old CRDs
+  janitor:
+    # Cleanup interval in minutes (default: 30)
+    cleanupIntervalMinutes: 30
+    # Retention period in days for completed/failed/skipped WorkloadRecommendation CRs (default: 7)
+    retentionDays: 7
   serviceAccount:
     name: "dakr-operator-sa"
     # Annotations for cloud provider IAM integration.
@@ -81,11 +98,16 @@ operator:
 
 scheduler:
   image:
-    tag: "v0.0.4"
+    tag: "v0.0.6"
   nodeCost:
     controlPlaneAddress: "https://dakr.devzero.io"
     controlPlaneToken: "REPLACE_WITH_TOKEN"
-    # tokenFromConfigMap: # If clusterToken is not specified above, operator will read from below ConfigMap value
+    # tokenFromSecret: # If controlPlaneToken is not specified above, scheduler will read from below Secret value (higher priority than ConfigMap)
+    #   name: "devzero-zxporter-token"      # Name of the Secret (must be in kube-system namespace where scheduler runs)
+    #   key: "CLUSTER_TOKEN"                # Key in the Secret's data to get the token
+    #   # NOTE: This matches the Secret created by zxporter (devzero-zxporter-token). Scheduler runs in kube-system namespace.
+    #   # If zxporter creates Secret in devzero-zxporter namespace, the Secret must be recreated in kube-system namespace.
+    # tokenFromConfigMap: # If controlPlaneToken is not specified above and not found in Secret, scheduler will read from below ConfigMap value
     #   name: "devzero-zxporter-env-config" # Name of the ConfigMap
     #   namespace: "devzero-zxporter"       # Namespace of the ConfigMap
     #   key: "CLUSTER_TOKEN"                # Key in the ConfigMap's data to get the token

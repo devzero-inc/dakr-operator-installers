@@ -82,6 +82,14 @@ spec:
           - --no-cloud-creds
           {{- end }}
         env:
+          {{- if .Values.operator.tokenFromSecret }}
+          - name: CLUSTER_TOKEN_FROM_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.operator.tokenFromSecret.name | quote }}
+                key: {{ .Values.operator.tokenFromSecret.key | quote }}
+                optional: true
+          {{- end }}
           {{- if .Values.operator.tokenFromConfigMap }}
           - name: TOKEN_CONFIGMAP_NAME
             value: {{ .Values.operator.tokenFromConfigMap.name | quote }}
@@ -98,6 +106,10 @@ spec:
           - name: CLUSTER_NAME_CONFIGMAP_KEY
             value: {{ .Values.operator.nameFromConfigMap.key | quote }}
           {{- end }}
+          - name: JANITOR_CLEANUP_INTERVAL_MINUTES
+            value: {{ .Values.operator.janitor.cleanupIntervalMinutes | default 30 | quote }}
+          - name: JANITOR_RETENTION_DAYS
+            value: {{ .Values.operator.janitor.retentionDays | default 7 | quote }}
         image: "{{ .Values.image.repository }}/{{ .Values.operator.image }}:{{ .Values.image.tag }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         name: manager
