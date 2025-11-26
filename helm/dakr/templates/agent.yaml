@@ -26,6 +26,9 @@ spec:
       serviceAccountName: {{ include "dakr.fullname" . }}-agent
       dnsPolicy: ClusterFirst
       terminationGracePeriodSeconds: 10
+      {{- if .Values.priorityClass.enabled }}
+      priorityClassName: {{ include "dakr.fullname" . }}-critical
+      {{- end }}
       nodeSelector:
         dakr.devzero.io/checkpoint-node: "true"
       tolerations:

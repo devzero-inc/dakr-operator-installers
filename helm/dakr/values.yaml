@@ -5,6 +5,13 @@ fullnameOverride: ""
 # Must be one of: "aws", "gcp", "azure", or "" (for no cloud provider).
 cloud: ""
 
+# Priority Class configuration for critical workloads
+# This ensures all DAKR components are not evicted under resource pressure
+priorityClass:
+  enabled: true  # Enable/disable creation of priority class
+  value: 1000000000  # Highest priority value
+  preemptionPolicy: PreemptLowerPriority  # Can preempt lower priority pods
+
 image:
   repository: docker.io/devzeroinc
   # This sets the pull policy for images.
@@ -18,6 +25,12 @@ operator:
   enabled: true
   image: dakr-operator
   replicas: 3
+  # Pod Disruption Budget configuration
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1  # or use maxUnavailable: 1
+    # maxUnavailable: 1  # Alternative to minAvailable
+    # unhealthyPodEvictionPolicy: IfHealthyBudget  # Optional: IfHealthyBudget, AlwaysAllow
   # IMPORTANT: When using Secrets for token configuration, note that Secrets cannot be accessed across namespaces.
   # If zxporter is installed in devzero-zxporter namespace by default, you have two options:
   # 1. Install dakr in the same namespace as zxporter (devzero-zxporter)
