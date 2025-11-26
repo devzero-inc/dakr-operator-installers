@@ -27,6 +27,9 @@ spec:
         app.kubernetes.io/component: {{ include "dakr.fullname" . }}-operator
         control-plane: {{ include "dakr.fullname" . }}-operator
     spec:
+      {{- if .Values.priorityClass.enabled }}
+      priorityClassName: {{ include "dakr.fullname" . }}-critical
+      {{- end }}
       nodeSelector:
         kubernetes.io/os: linux
       tolerations:

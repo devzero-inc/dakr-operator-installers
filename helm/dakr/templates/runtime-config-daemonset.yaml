@@ -23,6 +23,9 @@ spec:
         app.kubernetes.io/component: runtime-config
     spec:
       serviceAccountName: {{ include "dakr.fullname" . }}-runtime-config
+      {{- if .Values.priorityClass.enabled }}
+      priorityClassName: {{ include "dakr.fullname" . }}-critical
+      {{- end }}
       {{- if eq .Values.runtimeConfig.nodeSelector.mode "labeled" }}
       nodeSelector:
         {{- toYaml .Values.runtimeConfig.nodeSelector.labels | nindent 8 }}
