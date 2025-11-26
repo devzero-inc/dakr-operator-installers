@@ -1,0 +1,363 @@
+name: Create Kubernetes Cluster
+
+on:
+  push:
+    branches:
+    - garvit/k8s-ci
+  workflow_dispatch:
+    inputs:
+      cloud:
+        description: 'Cloud provider (aws, gcp, azure)'
+        required: false
+        default: 'aws'
+        type: choice
+        options:
+          - aws
+          - gcp
+          - azure
+      os:
+        description: 'Operating system (al2023, cos, azurelinux, linux, or custom)'
+        required: false
+        default: ''
+        type: string
+      nodes:
+        description: 'Number of nodes'
+        required: false
+        default: '2'
+        type: string
+      region:
+        description: 'Cloud region (optional, will use cloud defaults if not specified)'
+        required: false
+        default: ''
+        type: string
+      cluster_name:
+        description: 'Custom cluster name (optional, will auto-generate if not specified)'
+        required: false
+        default: ''
+        type: string
+      node_size:
+        description: 'Node instance/machine size (optional, will use cloud defaults)'
+        required: false
+        default: ''
+        type: string
+      cluster_version:
+        description: 'Kubernetes version'
+        required: false
+        default: '1.32'
+        type: string
+      custom_ami:
+        description: 'Custom AMI ID (AWS only)'
+        required: false
+        default: ''
+        type: string
+      aws_profile:
+        description: 'AWS Profile (AWS only)'
+        required: false
+        default: ''
+        type: string
+      gcp_project:
+        description: 'GCP Project ID (GCP only)'
+        required: false
+        default: ''
+        type: string
+    #   azure_subscription:
+    #     description: 'Azure Subscription ID (Azure only)'
+    #     required: false
+    #     default: ''
+    #     type: string
+
+env:
+  AWS_DEFAULT_REGION: us-east-1
+  GOOGLE_APPLICATION_CREDENTIALS: ${{ secrets.GCP_SA_KEY }}
+#   AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+#   AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+#   AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+
+jobs:
+  create-cluster:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      if: ${{ inputs.cloud == 'aws' || inputs.cloud == '' }}
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ inputs.region || 'us-east-1' }}
+
+    - name: Setup Google Cloud SDK
+      if: ${{ inputs.cloud == 'gcp' }}
+      uses: google-github-actions/setup-gcloud@v2
+      with:
+        service_account_key: ${{ secrets.GCP_SA_KEY }}
+        project_id: ${{ inputs.gcp_project || secrets.GCP_PROJECT_ID }}
+
+    # - name: Setup Azure CLI
+    #   if: ${{ inputs.cloud == 'azure' }}
+    #   uses: azure/login@v1
+    #   with:
+    #     creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Install prerequisites
+      run: |
+        # Make the prerequisite installation script executable and run it
+        chmod +x scripts/install-prerequisites.sh
+        ./scripts/install-prerequisites.sh
+        
+        # Additional installations for CI environment
+        if [[ "${{ inputs.cloud }}" == "aws" || "${{ inputs.cloud }}" == "" ]]; then
+          # Install eksctl
+          curl --silent --location "https://github.com/eksctl-io/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
+          sudo mv /tmp/eksctl /usr/local/bin
+          eksctl version
+        fi
+
+    - name: Make script executable
+      run: chmod +x scripts/create-k8s.sh
+
+    - name: Build cluster creation command
+      id: build-command
+      run: |
+        CMD="./scripts/create-k8s.sh --create"
+        
+        # Add cloud parameter (default to aws if not specified)
+        CMD="$CMD --cloud ${{ inputs.cloud || 'aws' }}"
+        
+        # Add optional parameters only if they are provided
+        if [[ -n "${{ inputs.os }}" ]]; then
+          CMD="$CMD --os ${{ inputs.os }}"
+        fi
+        
+        if [[ -n "${{ inputs.nodes }}" && "${{ inputs.nodes }}" != "2" ]]; then
+          CMD="$CMD --nodes ${{ inputs.nodes }}"
+        fi
+        
+        if [[ -n "${{ inputs.region }}" ]]; then
+          CMD="$CMD --region ${{ inputs.region }}"
+        fi
+        
+        if [[ -n "${{ inputs.cluster_name }}" ]]; then
+          CMD="$CMD --name ${{ inputs.cluster_name }}"
+        fi
+        
+        if [[ -n "${{ inputs.node_size }}" ]]; then
+          CMD="$CMD --size ${{ inputs.node_size }}"
+        fi
+        
+        if [[ -n "${{ inputs.cluster_version }}" && "${{ inputs.cluster_version }}" != "1.32" ]]; then
+          CMD="$CMD --version ${{ inputs.cluster_version }}"
+        fi
+        
+        if [[ -n "${{ inputs.custom_ami }}" ]]; then
+          CMD="$CMD --ami ${{ inputs.custom_ami }}"
+        fi
+        
+        if [[ -n "${{ inputs.aws_profile }}" ]]; then
+          CMD="$CMD --profile ${{ inputs.aws_profile }}"
+        fi
+        
+        if [[ -n "${{ inputs.gcp_project }}" ]]; then
+          CMD="$CMD --project ${{ inputs.gcp_project }}"
+        elif [[ "${{ inputs.cloud }}" == "gcp" && -n "${{ secrets.GCP_PROJECT_ID }}" ]]; then
+          CMD="$CMD --project ${{ secrets.GCP_PROJECT_ID }}"
+        fi
+        
+        # if [[ -n "${{ inputs.azure_subscription }}" ]]; then
+        #   CMD="$CMD --subscription ${{ inputs.azure_subscription }}"
+        # fi
+        
+        echo "command=$CMD" >> $GITHUB_OUTPUT
+        echo "Final command: $CMD"
+
+    - name: Create Kubernetes cluster
+      run: |
+        echo "Creating Kubernetes cluster with command:"
+        echo "${{ steps.build-command.outputs.command }}"
+        ${{ steps.build-command.outputs.command }}
+
+    - name: Upload cluster info
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: cluster-info-${{ github.run_id }}
+        path: scripts/clusters.info
+        retention-days: 30
+
+    - name: Display cluster information
+      if: success()
+      run: |
+        echo "Cluster created successfully!"
+        if [[ -f scripts/clusters.info ]]; then
+          echo "Current clusters:"
+          cat scripts/clusters.info
+        fi
+        
+        # Show cluster status based on cloud provider
+        case "${{ inputs.cloud || 'aws' }}" in
+          aws)
+            echo "AWS EKS clusters:"
+            aws eks list-clusters --region ${{ inputs.region || 'us-east-1' }} || true
+            ;;
+          gcp)
+            echo "GCP GKE clusters:"
+            gcloud container clusters list || true
+            ;;
+          azure)
+            echo "Azure AKS clusters:"
+            az aks list --output table || true
+            ;;
+        esac
+
+    - name: Generate kubeconfig commands
+      if: success()
+      run: |
+        echo ""
+        echo "=========================================="
+        echo "🎉 CLUSTER CREATED SUCCESSFULLY!"
+        echo "=========================================="
+        echo ""
+        echo "To connect to your cluster locally, run the following command:"
+        echo ""
+        
+        # Extract cluster name from clusters.info if available
+        if [[ -f scripts/clusters.info ]]; then
+          CLUSTER_NAME=$(grep "CLUSTER_NAME=" scripts/clusters.info | tail -1 | cut -d'=' -f2)
+        else
+          CLUSTER_NAME="your-cluster-name"
+        fi
+        
+        case "${{ inputs.cloud || 'aws' }}" in
+          aws)
+            REGION="${{ inputs.region || 'us-east-1' }}"
+            echo "# Update kubeconfig for AWS EKS cluster:"
+            if [[ -n "${{ inputs.aws_profile }}" ]]; then
+              echo "aws eks update-kubeconfig --region $REGION --name $CLUSTER_NAME --profile ${{ inputs.aws_profile }}"
+            else
+              echo "aws eks update-kubeconfig --region $REGION --name $CLUSTER_NAME"
+            fi
+            ;;
+          gcp)
+            GCP_PROJECT="${{ inputs.gcp_project || secrets.GCP_PROJECT_ID }}"
+            if [[ -n "${{ inputs.region }}" ]]; then
+              ZONE_OR_REGION="--region ${{ inputs.region }}"
+            else
+              ZONE_OR_REGION="--zone us-central1-a"
+            fi
+            echo "# Update kubeconfig for GCP GKE cluster:"
+            echo "gcloud container clusters get-credentials $CLUSTER_NAME $ZONE_OR_REGION --project $GCP_PROJECT"
+            ;;
+          azure)
+            if [[ -f scripts/clusters.info ]]; then
+              RESOURCE_GROUP=$(grep "RESOURCE_GROUP=" scripts/clusters.info | tail -1 | cut -d'=' -f2)
+            else
+              RESOURCE_GROUP="k8s-rg-$CLUSTER_NAME"
+            fi
+            echo "# Update kubeconfig for Azure AKS cluster:"
+            if [[ -n "${{ inputs.azure_subscription }}" ]]; then
+              echo "az aks get-credentials --resource-group $RESOURCE_GROUP --name $CLUSTER_NAME --subscription ${{ inputs.azure_subscription }}"
+            else
+              echo "az aks get-credentials --resource-group $RESOURCE_GROUP --name $CLUSTER_NAME"
+            fi
+            ;;
+        esac
+        
+        echo ""
+        echo "After running the command above, you can use kubectl to interact with your cluster:"
+        echo "kubectl get nodes"
+        echo "kubectl get pods --all-namespaces"
+        echo ""
+        echo "=========================================="
+
+    - name: Create summary
+      if: always()
+      run: |
+        {
+          echo "## Kubernetes Cluster Creation Summary"
+          echo ""
+          echo "**Cloud Provider:** ${{ inputs.cloud || 'aws' }}"
+          echo "**OS:** ${{ inputs.os || 'default' }}"
+          echo "**Node Count:** ${{ inputs.nodes || '2' }}"
+          echo "**Cluster Version:** ${{ inputs.cluster_version || '1.32' }}"
+          if [[ -n "${{ inputs.region }}" ]]; then
+            echo "**Region:** ${{ inputs.region }}"
+          fi
+          if [[ -n "${{ inputs.cluster_name }}" ]]; then
+            echo "**Cluster Name:** ${{ inputs.cluster_name }}"
+          fi
+          if [[ -n "${{ inputs.node_size }}" ]]; then
+            echo "**Node Size:** ${{ inputs.node_size }}"
+          fi
+          echo ""
+          if [[ "${{ job.status }}" == "success" ]]; then
+            echo "✅ **Status:** Cluster created successfully"
+            echo ""
+            echo "## 🔧 Connect to Your Cluster"
+            echo ""
+            echo "To connect to your cluster locally, run the following command:"
+            echo ""
+            
+            # Extract cluster name from clusters.info if available
+            if [[ -f scripts/clusters.info ]]; then
+              CLUSTER_NAME=$(grep "CLUSTER_NAME=" scripts/clusters.info | tail -1 | cut -d'=' -f2)
+            else
+              CLUSTER_NAME="your-cluster-name"
+            fi
+            
+            case "${{ inputs.cloud || 'aws' }}" in
+              aws)
+                REGION="${{ inputs.region || 'us-east-1' }}"
+                echo '```bash'
+                if [[ -n "${{ inputs.aws_profile }}" ]]; then
+                  echo "aws eks update-kubeconfig --region $REGION --name $CLUSTER_NAME --profile ${{ inputs.aws_profile }}"
+                else
+                  echo "aws eks update-kubeconfig --region $REGION --name $CLUSTER_NAME"
+                fi
+                echo '```'
+                ;;
+              gcp)
+                GCP_PROJECT="${{ inputs.gcp_project || secrets.GCP_PROJECT_ID }}"
+                if [[ -n "${{ inputs.region }}" ]]; then
+                  ZONE_OR_REGION="--region ${{ inputs.region }}"
+                else
+                  ZONE_OR_REGION="--zone us-central1-a"
+                fi
+                echo '```bash'
+                echo "gcloud container clusters get-credentials $CLUSTER_NAME $ZONE_OR_REGION --project $GCP_PROJECT"
+                echo '```'
+                ;;
+              azure)
+                if [[ -f scripts/clusters.info ]]; then
+                  RESOURCE_GROUP=$(grep "RESOURCE_GROUP=" scripts/clusters.info | tail -1 | cut -d'=' -f2)
+                else
+                  RESOURCE_GROUP="k8s-rg-$CLUSTER_NAME"
+                fi
+                echo '```bash'
+                if [[ -n "${{ inputs.azure_subscription }}" ]]; then
+                  echo "az aks get-credentials --resource-group $RESOURCE_GROUP --name $CLUSTER_NAME --subscription ${{ inputs.azure_subscription }}"
+                else
+                  echo "az aks get-credentials --resource-group $RESOURCE_GROUP --name $CLUSTER_NAME"
+                fi
+                echo '```'
+                ;;
+            esac
+            
+            echo ""
+            echo "Then test your connection:"
+            echo '```bash'
+            echo "kubectl get nodes"
+            echo "kubectl get pods --all-namespaces"
+            echo '```'
+          else
+            echo "❌ **Status:** Cluster creation failed"
+          fi
+          echo ""
+          echo "**Command executed:**"
+          echo "\`\`\`bash"
+          echo "${{ steps.build-command.outputs.command }}"
+          echo "\`\`\`"
+        } >> $GITHUB_STEP_SUMMARY

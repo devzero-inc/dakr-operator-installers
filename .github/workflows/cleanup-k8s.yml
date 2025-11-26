@@ -1,0 +1,408 @@
+name: Cleanup K8s Clusters and EC2 Instances
+
+on:
+  push:
+    branches:
+    - garvit/k8s-ci
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run mode (show what would be deleted without actually deleting)'
+        required: false
+        default: false
+        type: boolean
+      age_threshold_days:
+        description: 'Delete resources older than this many days'
+        required: false
+        default: '2'
+        type: string
+      force_delete:
+        description: 'Force delete resources even if they have protection'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  AWS_DEFAULT_REGION: us-east-1
+
+jobs:
+  cleanup-aws-resources:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    continue-on-error: true  # Fail open - don't fail the workflow if cleanup fails
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-1
+
+    - name: Install prerequisites
+      run: |
+        # Install required tools
+        sudo apt-get update
+        sudo apt-get install -y jq curl unzip
+        
+        # Check if AWS CLI is already installed, if not install it
+        if ! command -v aws &> /dev/null; then
+          echo "Installing AWS CLI v2..."
+          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+          unzip awscliv2.zip
+          sudo ./aws/install
+        else
+          echo "AWS CLI already installed, updating..."
+          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+          unzip awscliv2.zip
+          sudo ./aws/install --update
+        fi
+        aws --version
+        
+        # Install eksctl
+        curl --silent --location "https://github.com/eksctl-io/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
+        sudo mv /tmp/eksctl /usr/local/bin
+        eksctl version
+        
+        # Install kubectl
+        curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+        chmod +x kubectl
+        sudo mv kubectl /usr/local/bin/
+        kubectl version --client
+
+    - name: Set cleanup parameters
+      id: params
+      run: |
+        AGE_DAYS="${{ inputs.age_threshold_days || '2' }}"
+        DRY_RUN="${{ inputs.dry_run || 'false' }}"
+        FORCE_DELETE="${{ inputs.force_delete || 'false' }}"
+        
+        echo "age_days=$AGE_DAYS" >> $GITHUB_OUTPUT
+        echo "dry_run=$DRY_RUN" >> $GITHUB_OUTPUT
+        echo "force_delete=$FORCE_DELETE" >> $GITHUB_OUTPUT
+        
+        # Calculate cutoff date
+        CUTOFF_DATE=$(date -d "$AGE_DAYS days ago" --iso-8601=seconds)
+        echo "cutoff_date=$CUTOFF_DATE" >> $GITHUB_OUTPUT
+        
+        echo "Cleanup parameters:"
+        echo "- Age threshold: $AGE_DAYS days"
+        echo "- Cutoff date: $CUTOFF_DATE"
+        echo "- Dry run: $DRY_RUN"
+        echo "- Force delete: $FORCE_DELETE"
+
+    - name: List all AWS regions
+      id: regions
+      run: |
+        # Get all enabled regions
+        REGIONS=$(aws ec2 describe-regions --query 'Regions[].RegionName' --output text)
+        echo "regions=$REGIONS" >> $GITHUB_OUTPUT
+        echo "Will check regions: $REGIONS"
+
+    - name: Cleanup EKS clusters
+      run: |
+        echo "🔍 Scanning for old EKS clusters..."
+        
+        # Track what we find and delete
+        CLUSTERS_FOUND=0
+        CLUSTERS_DELETED=0
+        CLUSTERS_FAILED=0
+        
+        for region in ${{ steps.regions.outputs.regions }}; do
+          echo "Checking region: $region"
+          
+          # List EKS clusters in this region
+          CLUSTERS=$(aws eks list-clusters --region "$region" --query 'clusters' --output text 2>/dev/null || echo "")
+          
+          if [[ -n "$CLUSTERS" && "$CLUSTERS" != "None" ]]; then
+            for cluster in $CLUSTERS; do
+              echo "Found EKS cluster: $cluster in $region"
+              CLUSTERS_FOUND=$((CLUSTERS_FOUND + 1))
+              
+              # Get cluster creation date
+              CREATION_DATE=$(aws eks describe-cluster --region "$region" --name "$cluster" --query 'cluster.createdAt' --output text 2>/dev/null || echo "")
+              
+              if [[ -n "$CREATION_DATE" ]]; then
+                # Convert to comparable format
+                CREATION_TIMESTAMP=$(date -d "$CREATION_DATE" +%s)
+                CUTOFF_TIMESTAMP=$(date -d "${{ steps.params.outputs.cutoff_date }}" +%s)
+                
+                if [[ $CREATION_TIMESTAMP -lt $CUTOFF_TIMESTAMP ]]; then
+                  echo "🗑️  Cluster $cluster is older than ${{ steps.params.outputs.age_days }} days (created: $CREATION_DATE)"
+                  
+                  if [[ "${{ steps.params.outputs.dry_run }}" == "true" ]]; then
+                    echo "DRY RUN: Would delete EKS cluster $cluster in $region"
+                  else
+                    echo "Deleting EKS cluster: $cluster in $region"
+                    
+                    # Try to delete the cluster
+                    if eksctl delete cluster --region "$region" --name "$cluster" --wait --timeout=20m; then
+                      echo "✅ Successfully deleted cluster: $cluster"
+                      CLUSTERS_DELETED=$((CLUSTERS_DELETED + 1))
+                    else
+                      echo "❌ Failed to delete cluster: $cluster"
+                      CLUSTERS_FAILED=$((CLUSTERS_FAILED + 1))
+                      
+                      # Try force delete if enabled
+                      if [[ "${{ steps.params.outputs.force_delete }}" == "true" ]]; then
+                        echo "Attempting force delete..."
+                        aws eks delete-cluster --region "$region" --name "$cluster" || true
+                      fi
+                    fi
+                  fi
+                else
+                  echo "✅ Cluster $cluster is recent (created: $CREATION_DATE)"
+                fi
+              else
+                echo "⚠️  Could not get creation date for cluster: $cluster"
+              fi
+            done
+          fi
+        done
+        
+        echo "EKS Cleanup Summary:"
+        echo "- Clusters found: $CLUSTERS_FOUND"
+        echo "- Clusters deleted: $CLUSTERS_DELETED"
+        echo "- Clusters failed: $CLUSTERS_FAILED"
+        
+        # Export for summary
+        echo "CLUSTERS_FOUND=$CLUSTERS_FOUND" >> $GITHUB_ENV
+        echo "CLUSTERS_DELETED=$CLUSTERS_DELETED" >> $GITHUB_ENV
+        echo "CLUSTERS_FAILED=$CLUSTERS_FAILED" >> $GITHUB_ENV
+
+    - name: Cleanup EC2 instances
+      run: |
+        echo "🔍 Scanning for old EC2 instances..."
+        
+        # Track what we find and delete
+        INSTANCES_FOUND=0
+        INSTANCES_DELETED=0
+        INSTANCES_FAILED=0
+        
+        for region in ${{ steps.regions.outputs.regions }}; do
+          echo "Checking region: $region"
+          
+          # List running EC2 instances in this region
+          INSTANCES=$(aws ec2 describe-instances --region "$region" \
+            --filters "Name=instance-state-name,Values=running,stopped,stopping" \
+            --query 'Reservations[].Instances[].[InstanceId,LaunchTime,Tags[?Key==`Name`].Value|[0]]' \
+            --output text 2>/dev/null || echo "")
+          
+          if [[ -n "$INSTANCES" ]]; then
+            while IFS=$'\t' read -r instance_id launch_time instance_name; do
+              if [[ -n "$instance_id" && "$instance_id" != "None" ]]; then
+                echo "Found EC2 instance: $instance_id ($instance_name) in $region"
+                INSTANCES_FOUND=$((INSTANCES_FOUND + 1))
+                
+                if [[ -n "$launch_time" ]]; then
+                  # Convert to comparable format
+                  LAUNCH_TIMESTAMP=$(date -d "$launch_time" +%s)
+                  CUTOFF_TIMESTAMP=$(date -d "${{ steps.params.outputs.cutoff_date }}" +%s)
+                  
+                  if [[ $LAUNCH_TIMESTAMP -lt $CUTOFF_TIMESTAMP ]]; then
+                    echo "🗑️  Instance $instance_id is older than ${{ steps.params.outputs.age_days }} days (launched: $launch_time)"
+                    
+                    # Check if instance has termination protection
+                    PROTECTION=$(aws ec2 describe-instance-attribute --region "$region" --instance-id "$instance_id" --attribute disableApiTermination --query 'DisableApiTermination.Value' --output text 2>/dev/null || echo "false")
+                    
+                    if [[ "$PROTECTION" == "true" && "${{ steps.params.outputs.force_delete }}" != "true" ]]; then
+                      echo "⚠️  Instance $instance_id has termination protection enabled, skipping"
+                      continue
+                    fi
+                    
+                    if [[ "${{ steps.params.outputs.dry_run }}" == "true" ]]; then
+                      echo "DRY RUN: Would terminate EC2 instance $instance_id in $region"
+                    else
+                      echo "Terminating EC2 instance: $instance_id in $region"
+                      
+                      # Disable termination protection if needed
+                      if [[ "$PROTECTION" == "true" ]]; then
+                        echo "Disabling termination protection..."
+                        aws ec2 modify-instance-attribute --region "$region" --instance-id "$instance_id" --no-disable-api-termination || true
+                      fi
+                      
+                      # Terminate the instance
+                      if aws ec2 terminate-instances --region "$region" --instance-ids "$instance_id"; then
+                        echo "✅ Successfully terminated instance: $instance_id"
+                        INSTANCES_DELETED=$((INSTANCES_DELETED + 1))
+                      else
+                        echo "❌ Failed to terminate instance: $instance_id"
+                        INSTANCES_FAILED=$((INSTANCES_FAILED + 1))
+                      fi
+                    fi
+                  else
+                    echo "✅ Instance $instance_id is recent (launched: $launch_time)"
+                  fi
+                else
+                  echo "⚠️  Could not get launch time for instance: $instance_id"
+                fi
+              fi
+            done <<< "$INSTANCES"
+          fi
+        done
+        
+        echo "EC2 Cleanup Summary:"
+        echo "- Instances found: $INSTANCES_FOUND"
+        echo "- Instances deleted: $INSTANCES_DELETED"
+        echo "- Instances failed: $INSTANCES_FAILED"
+        
+        # Export for summary
+        echo "INSTANCES_FOUND=$INSTANCES_FOUND" >> $GITHUB_ENV
+        echo "INSTANCES_DELETED=$INSTANCES_DELETED" >> $GITHUB_ENV
+        echo "INSTANCES_FAILED=$INSTANCES_FAILED" >> $GITHUB_ENV
+
+    - name: Cleanup orphaned EBS volumes
+      run: |
+        echo "🔍 Scanning for orphaned EBS volumes..."
+        
+        VOLUMES_FOUND=0
+        VOLUMES_DELETED=0
+        VOLUMES_FAILED=0
+        
+        for region in ${{ steps.regions.outputs.regions }}; do
+          echo "Checking region: $region"
+          
+          # List available (unattached) EBS volumes
+          VOLUMES=$(aws ec2 describe-volumes --region "$region" \
+            --filters "Name=status,Values=available" \
+            --query 'Volumes[].[VolumeId,CreateTime]' \
+            --output text 2>/dev/null || echo "")
+          
+          if [[ -n "$VOLUMES" ]]; then
+            while IFS=$'\t' read -r volume_id create_time; do
+              if [[ -n "$volume_id" && "$volume_id" != "None" ]]; then
+                echo "Found orphaned EBS volume: $volume_id in $region"
+                VOLUMES_FOUND=$((VOLUMES_FOUND + 1))
+                
+                if [[ -n "$create_time" ]]; then
+                  CREATE_TIMESTAMP=$(date -d "$create_time" +%s)
+                  CUTOFF_TIMESTAMP=$(date -d "${{ steps.params.outputs.cutoff_date }}" +%s)
+                  
+                  if [[ $CREATE_TIMESTAMP -lt $CUTOFF_TIMESTAMP ]]; then
+                    echo "🗑️  Volume $volume_id is older than ${{ steps.params.outputs.age_days }} days (created: $create_time)"
+                    
+                    if [[ "${{ steps.params.outputs.dry_run }}" == "true" ]]; then
+                      echo "DRY RUN: Would delete EBS volume $volume_id in $region"
+                    else
+                      echo "Deleting EBS volume: $volume_id in $region"
+                      
+                      if aws ec2 delete-volume --region "$region" --volume-id "$volume_id"; then
+                        echo "✅ Successfully deleted volume: $volume_id"
+                        VOLUMES_DELETED=$((VOLUMES_DELETED + 1))
+                      else
+                        echo "❌ Failed to delete volume: $volume_id"
+                        VOLUMES_FAILED=$((VOLUMES_FAILED + 1))
+                      fi
+                    fi
+                  else
+                    echo "✅ Volume $volume_id is recent (created: $create_time)"
+                  fi
+                fi
+              fi
+            done <<< "$VOLUMES"
+          fi
+        done
+        
+        echo "EBS Cleanup Summary:"
+        echo "- Volumes found: $VOLUMES_FOUND"
+        echo "- Volumes deleted: $VOLUMES_DELETED"
+        echo "- Volumes failed: $VOLUMES_FAILED"
+        
+        # Export for summary
+        echo "VOLUMES_FOUND=$VOLUMES_FOUND" >> $GITHUB_ENV
+        echo "VOLUMES_DELETED=$VOLUMES_DELETED" >> $GITHUB_ENV
+        echo "VOLUMES_FAILED=$VOLUMES_FAILED" >> $GITHUB_ENV
+
+    - name: Update cluster info file
+      run: |
+        # Make script executable and use it to clean up the clusters.info file
+        chmod +x scripts/create-k8s.sh
+        
+        echo "🔍 Checking clusters.info file for deleted clusters..."
+        
+        if [[ -f scripts/clusters.info ]]; then
+          # Create a backup
+          cp scripts/clusters.info scripts/clusters.info.backup
+          
+          # Process each cluster entry and remove those that no longer exist
+          while IFS= read -r line; do
+            if [[ "$line" =~ ^CLOUD= ]]; then
+              # Extract cluster info
+              CLOUD=$(echo "$line" | grep -o 'CLOUD=[^,]*' | cut -d= -f2)
+              CLUSTER_NAME=$(echo "$line" | grep -o 'CLUSTER_NAME=[^,]*' | cut -d= -f2)
+              REGION=$(echo "$line" | grep -o 'REGION=[^,]*' | cut -d= -f2)
+              
+              if [[ "$CLOUD" == "aws" && -n "$CLUSTER_NAME" && -n "$REGION" ]]; then
+                # Check if EKS cluster still exists
+                if ! aws eks describe-cluster --region "$REGION" --name "$CLUSTER_NAME" >/dev/null 2>&1; then
+                  echo "Removing deleted cluster from info: $CLUSTER_NAME"
+                  # Use the script's deletion function
+                  sed -i "/CLOUD=aws,CLUSTER_NAME=$CLUSTER_NAME,REGION=$REGION/d" scripts/clusters.info
+                fi
+              fi
+            fi
+          done < scripts/clusters.info.backup
+          
+          echo "Updated clusters.info file"
+        fi
+
+    - name: Create cleanup summary
+      if: always()
+      run: |
+        {
+          echo "## AWS Resource Cleanup Summary"
+          echo ""
+          echo "**Cleanup Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "**Age Threshold:** ${{ steps.params.outputs.age_days }} days"
+          echo "**Cutoff Date:** ${{ steps.params.outputs.cutoff_date }}"
+          echo "**Mode:** ${{ steps.params.outputs.dry_run == 'true' && 'DRY RUN' || 'LIVE DELETION' }}"
+          echo ""
+          echo "### EKS Clusters"
+          echo "- 🔍 Found: ${CLUSTERS_FOUND:-0}"
+          echo "- 🗑️ Deleted: ${CLUSTERS_DELETED:-0}"
+          echo "- ❌ Failed: ${CLUSTERS_FAILED:-0}"
+          echo ""
+          echo "### EC2 Instances"
+          echo "- 🔍 Found: ${INSTANCES_FOUND:-0}"
+          echo "- 🗑️ Deleted: ${INSTANCES_DELETED:-0}"
+          echo "- ❌ Failed: ${INSTANCES_FAILED:-0}"
+          echo ""
+          echo "### EBS Volumes"
+          echo "- 🔍 Found: ${VOLUMES_FOUND:-0}"
+          echo "- 🗑️ Deleted: ${VOLUMES_DELETED:-0}"
+          echo "- ❌ Failed: ${VOLUMES_FAILED:-0}"
+          echo ""
+          
+          TOTAL_FOUND=$((${CLUSTERS_FOUND:-0} + ${INSTANCES_FOUND:-0} + ${VOLUMES_FOUND:-0}))
+          TOTAL_DELETED=$((${CLUSTERS_DELETED:-0} + ${INSTANCES_DELETED:-0} + ${VOLUMES_DELETED:-0}))
+          TOTAL_FAILED=$((${CLUSTERS_FAILED:-0} + ${INSTANCES_FAILED:-0} + ${VOLUMES_FAILED:-0}))
+          
+          echo "### Overall Summary"
+          echo "- **Total Resources Found:** $TOTAL_FOUND"
+          echo "- **Total Resources Deleted:** $TOTAL_DELETED"
+          echo "- **Total Failures:** $TOTAL_FAILED"
+          echo ""
+          
+          if [[ $TOTAL_FAILED -gt 0 ]]; then
+            echo "⚠️ **Note:** Some resources failed to delete. The workflow continues with 'fail open' behavior."
+          elif [[ $TOTAL_DELETED -gt 0 ]]; then
+            echo "✅ **Status:** Cleanup completed successfully"
+          else
+            echo "ℹ️ **Status:** No resources needed cleanup"
+          fi
+        } >> $GITHUB_STEP_SUMMARY
+
+    - name: Upload cleanup logs
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: cleanup-logs-${{ github.run_id }}
+        path: |
+          scripts/clusters.info*
+        retention-days: 30
