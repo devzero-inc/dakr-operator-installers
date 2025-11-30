@@ -52,6 +52,7 @@ rules:
   - "karpenter.k8s.aws"
   - "karpenter.azure.com"
   - "karpenter.gke.io"
+  - "karpenter.k8s.gcp"
   resources: ["*"]
   verbs: ["*"]
 {{- if .Capabilities.APIVersions.Has "keda.sh/v1alpha1/ScaledObject" }}
