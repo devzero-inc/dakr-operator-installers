@@ -17,18 +17,47 @@ metadata:
   labels:
     {{- include "dakr.labels" . | nindent 4 }}
 rules:
+# Core resources (v1)
 - apiGroups: [""]
-  resources: ["*"]
-  verbs: ["get", "list", "watch", "update", "patch", "create", "delete"]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch", "create", "delete"]
+- apiGroups: [""]
+  resources: ["pods/eviction"]
+  verbs: ["create"]
+- apiGroups: [""]
+  resources: ["pods/status"]
+  verbs: ["update"]
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["get", "list", "watch", "update", "delete"]
+- apiGroups: [""]
+  resources: ["nodes/status"]
+  verbs: ["update", "patch"]
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["replicationcontrollers"]
+  verbs: ["get", "list", "watch", "update", "patch"]
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["create", "patch"]
+# Apps resources (apps/v1)
 - apiGroups: ["apps"]
-  resources: ["*"]
+  resources: ["deployments", "statefulsets", "replicasets", "daemonsets"]
+  verbs: ["get", "list", "watch", "update", "patch"]
+# Batch resources (batch/v1)
+- apiGroups: ["batch"]
+  resources: ["jobs"]
   verbs: ["get", "list", "watch", "update", "patch", "create", "delete"]
 - apiGroups: ["batch"]
-  resources: ["*"]
-  verbs: ["get", "list", "watch", "update", "patch", "create", "delete"]
+  resources: ["cronjobs"]
+  verbs: ["get", "list", "watch", "update", "patch"]
+# Events.k8s.io resources
 - apiGroups: ["events.k8s.io"]
   resources: ["events"]
   verbs: ["get", "list", "watch", "create", "update", "patch"]
+# DAKR custom resources
 - apiGroups: ["dakr.devzero.io"]
   resources: ["workloadrecommendations", "nodegrouprecommendations"]
   verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
@@ -44,9 +73,19 @@ rules:
 - apiGroups: ["dakr.devzero.io"]
   resources: ["checkpointrestores/status"]
   verbs: ["get"]
+# RBAC resources
 - apiGroups: ["rbac.authorization.k8s.io"]
   resources: ["clusterroles"]
   verbs: ["get", "list", "watch", "update", "patch", "escalate"]
+# Scheduling resources
+- apiGroups: ["scheduling.k8s.io"]
+  resources: ["priorityclasses"]
+  verbs: ["create"]
+# Node resources
+- apiGroups: ["node.k8s.io"]
+  resources: ["runtimeclasses"]
+  verbs: ["get", "list"]
+# Karpenter resources (keep wildcards but limited to specific API groups)
 - apiGroups:
   - "karpenter.sh"
   - "karpenter.k8s.aws"
@@ -56,16 +95,19 @@ rules:
   resources: ["*"]
   verbs: ["*"]
 {{- if .Capabilities.APIVersions.Has "keda.sh/v1alpha1/ScaledObject" }}
+# KEDA resources
 - apiGroups: ["keda.sh"]
   resources: ["scaledobjects"]
   verbs: ["get", "list", "update", "patch"]
 {{- end }}
 {{- if .Capabilities.APIVersions.Has "argoproj.io/v1alpha1/Application" }}
+# Argo CD resources
 - apiGroups: ["argoproj.io"]
   resources: ["applications"]
   verbs: ["get", "list", "watch", "update", "patch"]
 {{- end }}
 {{- if .Capabilities.APIVersions.Has "argoproj.io/v1alpha1/Rollout" }}
+# Argo Rollouts resources
 - apiGroups: ["argoproj.io"]
   resources: ["rollouts"]
   verbs: ["get", "list", "watch", "update", "patch"]
@@ -74,6 +116,7 @@ rules:
   verbs: ["get", "update", "patch"]
 {{- end }}
 {{- if .Capabilities.APIVersions.Has "kubeflow.org/v1/Notebook" }}
+# Kubeflow resources
 - apiGroups: ["kubeflow.org"]
   resources: ["notebooks"]
   verbs: ["get", "list", "watch", "update", "patch"]
