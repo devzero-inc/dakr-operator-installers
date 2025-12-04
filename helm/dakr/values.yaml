@@ -17,7 +17,7 @@ image:
   # This sets the pull policy for images.
   pullPolicy: Always 
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "v0.0.39"
+  tag: "v0.0.42"
 
 imagePullSecrets: []
 
@@ -42,11 +42,11 @@ operator:
       memory: 64Mi
   endpoint: "https://dakr.devzero.io"
   logLevel: "info"
-  clusterToken: "REPLACE_WITH_TOKEN" # If this is empty, the operator will attempt to read from Secret or ConfigMap below.
+  clusterToken: "" # Required: Authentication token for DAKR control plane. If empty, the operator will attempt to read from Secret or ConfigMap below.
                    # If set to a non-empty string, this value will be used directly.
-  clusterName: "REPLACE_WITH_CLUSTER_NAME" # If this is empty, the operator will attempt to read from the ConfigMap below.
+  clusterName: "" # Required: Unique identifier for this Kubernetes cluster. If empty, the operator will attempt to read from the ConfigMap below.
                   # If set to a non-empty string, this value will be used directly.
-  clusterLocation: "REPLACE_WITH_CLUSTER_LOCATION"  # usually the cloud region code for where the cluster is running, can also be the zone if the cluster is zonal
+  clusterLocation: ""  # Required: Cloud region/zone where the cluster is running (e.g., us-west-2, europe-west1-b)
   # noCloudCreds: true # If true, operator will not attempt to perform node scaling operations, and will not require cloud credentials
   # tokenFromSecret: # If clusterToken is not specified above, operator will read from below Secret value (higher priority than ConfigMap)
   #   name: "devzero-zxporter-token"      # Name of the Secret (must be in the same namespace as the operator)
@@ -104,17 +104,22 @@ operator:
     #   "iam.gke.io/gcp-service-account": "your-gcp-sa-email@your-gcp-project-id.iam.gserviceaccount.com"
     # Azure:
     #   "azure.workload.identity/client-id": "YOUR_USER_ASSIGNED_IDENTITY_CLIENT_ID"
-    annotations:
+    annotations: {}
       # Replace with the appropriate key-value pair from your Terraform output
-      # (see instructions above). 
-      "REPLACE_WITH_ANNOTATION_KEY": "REPLACE_WITH_ANNOTATION_VALUE"
+      # (see instructions above).
+      # Example for AWS:
+      # "eks.amazonaws.com/role-arn": "arn:aws:iam::123456789012:role/cluster-dakr-operator-sa-role"
+      # Example for GCP:
+      # "iam.gke.io/gcp-service-account": "dakr-operator-sa@project-id.iam.gserviceaccount.com"
+      # Example for Azure:
+      # "azure.workload.identity/client-id": "12345678-1234-1234-1234-123456789012"
 
 scheduler:
   image:
     tag: "v0.0.6"
   nodeCost:
     controlPlaneAddress: "https://dakr.devzero.io"
-    controlPlaneToken: "REPLACE_WITH_TOKEN"
+    controlPlaneToken: "" # Required: Authentication token for DAKR control plane (same as operator.clusterToken)
     # tokenFromSecret: # If controlPlaneToken is not specified above, scheduler will read from below Secret value (higher priority than ConfigMap)
     #   name: "devzero-zxporter-token"      # Name of the Secret (must be in kube-system namespace where scheduler runs)
     #   key: "CLUSTER_TOKEN"                # Key in the Secret's data to get the token

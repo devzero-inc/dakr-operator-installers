@@ -1,0 +1,91 @@
+{{- if .Values.operator.enabled }}
+Thank you for installing {{ .Chart.Name }}.
+
+Your release is named {{ .Release.Name }}.
+
+To learn more about the release, try:
+
+  $ helm status {{ .Release.Name }}
+  $ helm get all {{ .Release.Name }}
+
+{{- if and (not .Values.operator.clusterToken) (not .Values.operator.tokenFromSecret) (not .Values.operator.tokenFromConfigMap) }}
+
+NOTE: No explicit cluster token configuration detected.
+
+The DAKR operator will automatically attempt to read the cluster token from the zxporter
+installation if both are installed in the same namespace (typically devzero-zxporter).
+
+If DAKR is installed in a different namespace or automatic discovery fails, you'll need to:
+1. Set operator.clusterToken in your values
+2. Configure operator.tokenFromSecret to read from a Kubernetes Secret (copy the secret to DAKR's namespace)
+3. Configure operator.tokenFromConfigMap to read from a ConfigMap (can reference cross-namespace)
+
+{{- end }}
+
+{{- if not .Values.operator.clusterName }}
+
+NOTE: No cluster name configured.
+The operator will attempt to read the cluster name from the configured ConfigMap if available.
+To set explicitly, configure operator.clusterName in your values.
+
+{{- end }}
+
+{{- if not .Values.operator.clusterLocation }}
+
+NOTE: No cluster location configured.
+Consider setting operator.clusterLocation to your cloud region/zone (e.g., us-west-2, europe-west1-b)
+for better resource optimization.
+
+{{- end }}
+
+{{- if and .Values.cloud (not .Values.operator.noCloudCreds) }}
+{{- $hasAnnotations := false }}
+{{- range $key, $value := .Values.operator.serviceAccount.annotations }}
+  {{- if $value }}
+    {{- $hasAnnotations = true }}
+  {{- end }}
+{{- end }}
+{{- if not $hasAnnotations }}
+
+IMPORTANT: Cloud provider '{{ .Values.cloud }}' is configured but no service account annotations are set.
+The operator may not have the necessary permissions to manage cloud resources.
+
+Please configure the appropriate service account annotations:
+{{- if eq .Values.cloud "aws" }}
+  operator.serviceAccount.annotations:
+    "eks.amazonaws.com/role-arn": "arn:aws:iam::ACCOUNT_ID:role/ROLE_NAME"
+{{- else if eq .Values.cloud "gcp" }}
+  operator.serviceAccount.annotations:
+    "iam.gke.io/gcp-service-account": "SA_NAME@PROJECT_ID.iam.gserviceaccount.com"
+{{- else if eq .Values.cloud "azure" }}
+  operator.serviceAccount.annotations:
+    "azure.workload.identity/client-id": "CLIENT_ID"
+{{- end }}
+
+Run the appropriate Terraform module in terraform/{{ .Values.cloud }}/ to create the required IAM resources.
+{{- end }}
+{{- end }}
+
+{{- if .Values.webhook.enabled }}
+
+The DAKR admission webhook has been enabled.
+{{- end }}
+
+{{- if .Values.agent.enabled }}
+
+The DAKR agent DaemonSet has been deployed to all nodes.
+{{- end }}
+
+{{- if .Values.runtimeConfig.enabled }}
+
+Runtime configuration has been enabled for {{ .Values.runtimeConfig.runtime }}.
+{{- if .Values.runtimeConfig.registryMirrors.enabled }}
+Registry mirrors have been configured for faster image pulls.
+{{- end }}
+{{- end }}
+
+To check the operator status:
+  $ kubectl get pods -n {{ .Release.Namespace }} -l app.kubernetes.io/component={{ include "dakr.fullname" . }}-operator
+
+For more information, visit: https://devzero.io/docs
+{{- end }}
