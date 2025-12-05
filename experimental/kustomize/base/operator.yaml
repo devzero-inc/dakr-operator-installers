@@ -1,0 +1,132 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dakr-operator
+  labels:
+    app.kubernetes.io/name: dakr
+    app.kubernetes.io/instance: dakr
+    app.kubernetes.io/version: "0.1.14"
+    app.kubernetes.io/component: dakr-operator
+    control-plane: dakr-operator
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: dakr
+      app.kubernetes.io/instance: dakr
+      app.kubernetes.io/component: dakr-operator
+      control-plane: dakr-operator
+  replicas: 3
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/default-container: manager
+      labels:
+        app.kubernetes.io/name: dakr
+        app.kubernetes.io/instance: dakr
+        app.kubernetes.io/component: dakr-operator
+        control-plane: dakr-operator
+    spec:
+      priorityClassName: dakr-critical
+      nodeSelector:
+        kubernetes.io/os: linux
+      tolerations:
+        - effect: NoSchedule
+          operator: Exists
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                - key: kubernetes.io/arch
+                  operator: In
+                  values:
+                    - amd64
+                    - arm64
+                - key: kubernetes.io/os
+                  operator: In
+                  values:
+                    - linux
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - command:
+        - /operator
+        args:
+          - --health-probe-bind-address=:8081
+          - --endpoint=https://dakr.devzero.io
+          # - --cluster-token=
+          # - --cluster-name=
+          # - --cluster-location=
+          - --debug-http-addr=:8082
+          - --workload-rec-batch-size=1
+          - --node-group-rec-batch-size=1
+          - --leader-election=true
+          - --leader-election-namespace=default
+          - --service-account-name=system:serviceaccount:default:dakr-operator-sa
+          - --zap-log-level=info
+          - --no-cloud-creds
+        env:
+          - name: JANITOR_CLEANUP_INTERVAL_MINUTES
+            value: "30"
+          - name: JANITOR_RETENTION_DAYS
+            value: "7"
+          - name: TOKEN_CONFIGMAP_NAME
+            value: "devzero-zxporter-env-config"
+          - name: TOKEN_CONFIGMAP_NAMESPACE
+            value: "devzero-zxporter"
+          - name: TOKEN_CONFIGMAP_KEY
+            value: "CLUSTER_TOKEN"
+        image: "docker.io/devzeroinc/dakr-operator:v0.0.42"
+        imagePullPolicy: Always
+        name: manager
+        ports:
+          - name: debug
+            protocol: TCP
+            containerPort: 8082
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - "ALL"
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+      serviceAccountName: dakr-operator-sa
+      terminationGracePeriodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dakr-operator
+  labels:
+    app.kubernetes.io/name: dakr
+    app.kubernetes.io/instance: dakr
+    app.kubernetes.io/version: "0.1.14"
+    app.kubernetes.io/component: dakr-operator
+    control-plane: dakr-operator
+spec:
+  selector:
+    app.kubernetes.io/component: dakr-operator
+    control-plane: dakr-operator
+  type: ClusterIP
+  ports:
+    # Debug HTTP server port
+    - name: debug
+      protocol: TCP
+      port: 8082
+      targetPort: debug

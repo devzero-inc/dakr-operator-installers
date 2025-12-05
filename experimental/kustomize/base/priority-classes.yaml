@@ -1,0 +1,12 @@
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: dakr-critical
+  labels:
+    app.kubernetes.io/name: dakr
+    app.kubernetes.io/instance: dakr
+    app.kubernetes.io/version: "0.1.14"
+value: 1000000000
+globalDefault: false
+description: "Critical priority class for all DAKR components"
+preemptionPolicy: PreemptLowerPriority
