@@ -1,0 +1,17 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: dakr-operator-pdb
+  labels:
+    app.kubernetes.io/name: dakr
+    app.kubernetes.io/instance: dakr
+    app.kubernetes.io/version: "0.1.14"
+    app.kubernetes.io/component: dakr-operator
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: dakr
+      app.kubernetes.io/instance: dakr
+      app.kubernetes.io/component: dakr-operator
+      control-plane: dakr-operator

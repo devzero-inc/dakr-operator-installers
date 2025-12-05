@@ -1,0 +1,236 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dakr-operator-sa
+  labels:
+    app.kubernetes.io/name: dakr
+    app.kubernetes.io/instance: dakr
+    app.kubernetes.io/version: "0.1.14"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: dakr-operator-role
+  labels:
+    app.kubernetes.io/name: dakr
+    app.kubernetes.io/instance: dakr
+    app.kubernetes.io/version: "0.1.14"
+rules:
+# Core resources (v1)
+# Pods: Read-only for pod lookup and webhook mutations
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch"]
+# Nodes: For cordon, drain, and taint operations
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["get", "list", "watch", "update", "patch"]
+# ConfigMaps: Read-only for configuration
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "list", "watch"]
+# ReplicationControllers: Legacy but still supported for resizing
+- apiGroups: [""]
+  resources: ["replicationcontrollers"]
+  verbs: ["get", "list", "watch", "update", "patch"]
+# Events: For audit trail
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["create", "patch"]
+# Apps resources (apps/v1) - For workload resizing
+- apiGroups: ["apps"]
+  resources: ["deployments", "statefulsets", "replicasets", "daemonsets"]
+  verbs: ["get", "list", "watch", "update", "patch"]
+# Batch resources (batch/v1) - For job and cronjob resizing
+- apiGroups: ["batch"]
+  resources: ["jobs"]
+  verbs: ["get", "list", "watch", "update", "patch"]
+- apiGroups: ["batch"]
+  resources: ["cronjobs"]
+  verbs: ["get", "list", "watch", "update", "patch"]
+# DAKR custom resources - Core functionality
+- apiGroups: ["dakr.devzero.io"]
+  resources: ["workloadrecommendations", "nodegrouprecommendations"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["dakr.devzero.io"]
+  resources: ["workloadrecommendations/status", "nodegrouprecommendations/status"]
+  verbs: ["get", "update", "patch"]
+- apiGroups: ["dakr.devzero.io"]
+  resources: ["workloadrecommendations/finalizers", "nodegrouprecommendations/finalizers"]
+  verbs: ["update"]
+# CheckpointRestores: Read-only monitoring
+- apiGroups: ["dakr.devzero.io"]
+  resources: ["checkpointrestores"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["dakr.devzero.io"]
+  resources: ["checkpointrestores/status"]
+  verbs: ["get"]
+# Karpenter resources - Core Karpenter API
+- apiGroups: ["karpenter.sh"]
+  resources: ["nodegroups", "nodeclaims"]
+  verbs: ["get", "list", "watch", "update", "patch"]
+# NOTE: Cloud-specific Karpenter resources should be granted via separate
+# ClusterRoles based on the deployment environment (AWS, Azure, GCP)
+# See kustomize/overlays/<cloud-provider>/ for cloud-specific permissions
+# KEDA resources - For updating scaled objects
+- apiGroups: ["keda.sh"]
+  resources: ["scaledobjects"]
+  verbs: ["get", "list", "watch", "update", "patch"]
+# Argo CD resources - For application patching
+- apiGroups: ["argoproj.io"]
+  resources: ["applications"]
+  verbs: ["get", "list", "watch", "update", "patch"]
+# Argo Rollouts resources - For rollout resizing
+- apiGroups: ["argoproj.io"]
+  resources: ["rollouts"]
+  verbs: ["get", "list", "watch", "update", "patch"]
+- apiGroups: ["argoproj.io"]
+  resources: ["rollouts/status"]
+  verbs: ["get", "update", "patch"]
+# Kubeflow resources - For notebook resizing
+- apiGroups: ["kubeflow.org"]
+  resources: ["notebooks"]
+  verbs: ["get", "list", "watch", "update", "patch"]
+- apiGroups: ["kubeflow.org"]
+  resources: ["notebooks/status"]
+  verbs: ["get", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: dakr-operator-crb
+  labels:
+    app.kubernetes.io/name: dakr
+    app.kubernetes.io/instance: dakr
+    app.kubernetes.io/version: "0.1.14"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: dakr-operator-role
+subjects:
+- kind: ServiceAccount
+  name: dakr-operator-sa
+  namespace: default
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: dakr-operator-leader-election-role
+  labels:
+    app.kubernetes.io/name: dakr
+    app.kubernetes.io/instance: dakr
+    app.kubernetes.io/version: "0.1.14"
+rules:
+# ConfigMaps: For leader election
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+# Leases: For leader election
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+# Events: For leader election events
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["create", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: dakr-operator-leader-election-rb
+  labels:
+    app.kubernetes.io/name: dakr
+    app.kubernetes.io/instance: dakr
+    app.kubernetes.io/version: "0.1.14"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: dakr-operator-leader-election-role
+subjects:
+- kind: ServiceAccount
+  name: dakr-operator-sa
+  namespace: default
+---
+# Optional: Cloud-specific Karpenter permissions
+# Uncomment and apply the appropriate section based on your cloud provider
+---
+# AWS Karpenter permissions
+# apiVersion: rbac.authorization.k8s.io/v1
+# kind: ClusterRole
+# metadata:
+#   name: dakr-operator-karpenter-aws
+#   labels:
+#     app.kubernetes.io/name: dakr
+#     app.kubernetes.io/instance: dakr
+#     app.kubernetes.io/version: "0.1.14"
+# rules:
+# - apiGroups: ["karpenter.k8s.aws"]
+#   resources: ["nodegroups", "ec2nodeclasses"]
+#   verbs: ["get", "list", "watch", "update", "patch"]
+# ---
+# apiVersion: rbac.authorization.k8s.io/v1
+# kind: ClusterRoleBinding
+# metadata:
+#   name: dakr-operator-karpenter-aws-crb
+# roleRef:
+#   apiGroup: rbac.authorization.k8s.io
+#   kind: ClusterRole
+#   name: dakr-operator-karpenter-aws
+# subjects:
+# - kind: ServiceAccount
+#   name: dakr-operator-sa
+#   namespace: default
+---
+# Azure Karpenter permissions
+# apiVersion: rbac.authorization.k8s.io/v1
+# kind: ClusterRole
+# metadata:
+#   name: dakr-operator-karpenter-azure
+#   labels:
+#     app.kubernetes.io/name: dakr
+#     app.kubernetes.io/instance: dakr
+#     app.kubernetes.io/version: "0.1.14"
+# rules:
+# - apiGroups: ["karpenter.azure.com"]
+#   resources: ["nodegroups", "aksnodeclasses"]
+#   verbs: ["get", "list", "watch", "update", "patch"]
+# ---
+# apiVersion: rbac.authorization.k8s.io/v1
+# kind: ClusterRoleBinding
+# metadata:
+#   name: dakr-operator-karpenter-azure-crb
+# roleRef:
+#   apiGroup: rbac.authorization.k8s.io
+#   kind: ClusterRole
+#   name: dakr-operator-karpenter-azure
+# subjects:
+# - kind: ServiceAccount
+#   name: dakr-operator-sa
+#   namespace: default
+---
+# GCP Karpenter permissions
+# apiVersion: rbac.authorization.k8s.io/v1
+# kind: ClusterRole
+# metadata:
+#   name: dakr-operator-karpenter-gcp
+#   labels:
+#     app.kubernetes.io/name: dakr
+#     app.kubernetes.io/instance: dakr
+#     app.kubernetes.io/version: "0.1.14"
+# rules:
+# - apiGroups: ["karpenter.gke.io", "karpenter.k8s.gcp"]
+#   resources: ["nodegroups", "gkenodeclasses", "gcpnodeclasses"]
+#   verbs: ["get", "list", "watch", "update", "patch"]
+# ---
+# apiVersion: rbac.authorization.k8s.io/v1
+# kind: ClusterRoleBinding
+# metadata:
+#   name: dakr-operator-karpenter-gcp-crb
+# roleRef:
+#   apiGroup: rbac.authorization.k8s.io
+#   kind: ClusterRole
+#   name: dakr-operator-karpenter-gcp
+# subjects:
+# - kind: ServiceAccount
+#   name: dakr-operator-sa
+#   namespace: default

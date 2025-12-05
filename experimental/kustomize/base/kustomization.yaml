@@ -1,0 +1,24 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: dakr-operator-base
+
+resources:
+  - crds.yaml
+  - priority-classes.yaml
+  - operator-rbac.yaml
+  - operator.yaml
+  - operator-pdb.yaml
+
+commonLabels:
+  app.kubernetes.io/name: dakr
+  app.kubernetes.io/instance: dakr
+  app.kubernetes.io/version: "0.1.14"
+  app.kubernetes.io/managed-by: kustomize
+
+namespace: default
+
+images:
+  - name: docker.io/devzeroinc/dakr-operator
+    newTag: v0.0.42
