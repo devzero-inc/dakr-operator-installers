@@ -18,18 +18,43 @@ metadata:
     {{- include "dakr.labels" . | nindent 4 }}
 rules:
 # Core resources (v1)
+# Pod access - configurable based on security settings
 - apiGroups: [""]
   resources: ["pods"]
-  verbs: ["get", "list", "watch", "create", "delete"]
+  verbs: 
+  {{- if .Values.operator.rbac.allowDangerousPermissions.createDeletePods }}
+    - "get"
+    - "list"
+    - "watch"
+    - "create"
+    - "delete"
+  {{- else }}
+    - "get"
+    - "list"
+    - "watch"
+  {{- end }}
 - apiGroups: [""]
   resources: ["pods/eviction"]
   verbs: ["create"]
 - apiGroups: [""]
   resources: ["pods/status"]
   verbs: ["update"]
+# Node access - configurable based on security settings
 - apiGroups: [""]
   resources: ["nodes"]
-  verbs: ["get", "list", "watch", "update", "delete"]
+  verbs:
+  {{- if .Values.operator.rbac.allowDangerousPermissions.deleteNodes }}
+    - "get"
+    - "list"
+    - "watch"
+    - "update"
+    - "delete"
+  {{- else }}
+    - "get"
+    - "list"
+    - "watch"
+    - "update"
+  {{- end }}
 - apiGroups: [""]
   resources: ["nodes/status"]
   verbs: ["update", "patch"]
@@ -49,7 +74,7 @@ rules:
 # Batch resources (batch/v1)
 - apiGroups: ["batch"]
   resources: ["jobs"]
-  verbs: ["get", "list", "watch", "update", "patch", "create", "delete"]
+  verbs: ["get", "list", "watch", "update", "patch", "delete", "create"]
 - apiGroups: ["batch"]
   resources: ["cronjobs"]
   verbs: ["get", "list", "watch", "update", "patch"]
@@ -73,27 +98,60 @@ rules:
 - apiGroups: ["dakr.devzero.io"]
   resources: ["checkpointrestores/status"]
   verbs: ["get"]
-# RBAC resources
+# RBAC resources - configurable based on security settings
 - apiGroups: ["rbac.authorization.k8s.io"]
   resources: ["clusterroles"]
-  verbs: ["get", "list", "watch", "update", "patch", "escalate"]
-# Scheduling resources
+  verbs:
+  {{- if .Values.operator.rbac.allowDangerousPermissions.escalateClusterRoles }}
+    - "get"
+    - "list"
+    - "watch"
+    - "update"
+    - "patch"
+    - "escalate"
+  {{- else }}
+    - "get"
+    - "list"
+    - "watch"
+  {{- end }}
+# Scheduling resources - configurable based on security settings
 - apiGroups: ["scheduling.k8s.io"]
   resources: ["priorityclasses"]
-  verbs: ["create"]
+  verbs:
+  {{- if .Values.operator.rbac.allowDangerousPermissions.createPriorityClasses }}
+    - "get"
+    - "list"
+    - "watch"
+    - "create"
+  {{- else }}
+    - "get"
+    - "list"
+    - "watch"
+  {{- end }}
 # Node resources
 - apiGroups: ["node.k8s.io"]
   resources: ["runtimeclasses"]
   verbs: ["get", "list"]
-# Karpenter resources (keep wildcards but limited to specific API groups)
-- apiGroups:
-  - "karpenter.sh"
-  - "karpenter.k8s.aws"
-  - "karpenter.azure.com"
-  - "karpenter.gke.io"
-  - "karpenter.k8s.gcp"
-  resources: ["*"]
-  verbs: ["*"]
+# Karpenter core resources
+- apiGroups: ["karpenter.sh"]
+  resources: ["machines", "nodeclaims", "nodepools", "provisioners"]
+  verbs: ["get", "list", "watch", "update", "patch"]
+# AWS Karpenter resources
+- apiGroups: ["karpenter.k8s.aws"]
+  resources: ["awsnodetemplates", "ec2nodeclasses"]
+  verbs: ["get", "list", "watch", "update", "patch"]
+# Azure Karpenter resources
+- apiGroups: ["karpenter.azure.com"]
+  resources: ["aksnodeclasses"]
+  verbs: ["get", "list", "watch", "update", "patch"]
+# GCP Karpenter resources
+- apiGroups: ["karpenter.k8s.gcp"]
+  resources: ["gcenodeclasses"]
+  verbs: ["get", "list", "watch", "update", "patch"]
+# Oracle Karpenter resources
+- apiGroups: ["karpenter.k8s.oracle"]
+  resources: ["ocinodeclasses"]
+  verbs: ["get", "list", "watch", "update", "patch"]
 {{- if .Capabilities.APIVersions.Has "keda.sh/v1alpha1/ScaledObject" }}
 # KEDA resources
 - apiGroups: ["keda.sh"]
@@ -123,6 +181,15 @@ rules:
 - apiGroups: ["kubeflow.org"]
   resources: ["notebooks/status"]
   verbs: ["get", "update", "patch"]
+{{- end }}
+{{- if .Capabilities.APIVersions.Has "batch.volcano.sh/v1alpha1/Job" }}
+# Volcano resources
+- apiGroups: ["batch.volcano.sh"]
+  resources: ["jobs"]
+  verbs: ["get", "list", "watch", "update", "patch", "delete", "create"]
+- apiGroups: ["batch.volcano.sh"]
+  resources: ["jobs/status"]
+  verbs: ["get", "update", "patch", "delete", "create"]
 {{- end }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1

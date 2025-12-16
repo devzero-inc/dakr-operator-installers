@@ -62,6 +62,7 @@ spec:
           - --agent-namespace={{ .Release.Namespace }}
           - --agent-app-name={{ include "dakr.fullname" . }}-agent
           - --endpoint={{ .Values.operator.endpoint }}
+          - --zxporter-addr={{ .Values.operator.zxporterAddr }}
           - --cluster-token={{ .Values.operator.clusterToken }}
           - --cluster-name={{ .Values.operator.clusterName }}
           - --cluster-location={{ .Values.operator.clusterLocation }}
@@ -83,6 +84,17 @@ spec:
           {{- end }}
           {{- if .Values.operator.noCloudCreds }}
           - --no-cloud-creds
+          {{- end }}
+          {{- if .Values.webhook.validator.enabled }}
+          - --enable-validator={{ .Values.webhook.validator.enabled }}
+          - --validator-allow-container-resources={{ .Values.webhook.validator.allowedFields.containerResources | default true }}
+          - --validator-allow-replica-count={{ .Values.webhook.validator.allowedFields.replicaCount | default true }}
+          - --validator-allow-scheduler-name={{ .Values.webhook.validator.allowedFields.schedulerName | default true }}
+          - --validator-allow-runtime-class={{ .Values.webhook.validator.allowedFields.runtimeClassName | default false }}
+          - --validator-allow-dakr-labels={{ .Values.webhook.validator.allowedFields.dakrLabels | default true }}
+          - --validator-max-cpu={{ .Values.webhook.validator.resourceLimits.maxCpu | default "1000" }}
+          - --validator-max-memory={{ .Values.webhook.validator.resourceLimits.maxMemory | default "100Ti" }}
+          - --validator-max-replicas={{ .Values.webhook.validator.resourceLimits.maxReplicas | default 10000 }}
           {{- end }}
         env:
           {{- if .Values.operator.tokenFromSecret }}
@@ -113,6 +125,8 @@ spec:
             value: {{ .Values.operator.janitor.cleanupIntervalMinutes | default 30 | quote }}
           - name: JANITOR_RETENTION_DAYS
             value: {{ .Values.operator.janitor.retentionDays | default 7 | quote }}
+          - name: ENABLE_MPA_CONTROLLER
+            value: {{ .Values.mpaController.enabled | quote }}
         image: "{{ .Values.image.repository }}/{{ .Values.operator.image }}:{{ .Values.image.tag }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         name: manager

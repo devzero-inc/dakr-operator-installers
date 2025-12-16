@@ -454,6 +454,10 @@ spec:
                   properties:
                     containerName:
                       type: string
+                    cpuLimitsAdjustmentEnabled:
+                      description: CpuLimitsAdjustmentEnabled indicates if the policy
+                        allows CPU limits to be adjusted
+                      type: boolean
                     currentLimit:
                       properties:
                         cpu:
@@ -500,9 +504,34 @@ spec:
                           format: int64
                           type: integer
                       type: object
+                    maxCpu:
+                      description: MaxCpu is the maximum allowed CPU limit in millicores
+                      format: int64
+                      type: integer
+                    maxMemory:
+                      description: MaxMemory is the maximum allowed Memory limit in
+                        bytes
+                      format: int64
+                      type: integer
+                    memoryLimitsAdjustmentEnabled:
+                      description: MemoryLimitsAdjustmentEnabled indicates if the
+                        policy allows Memory limits to be adjusted
+                      type: boolean
+                    minCpu:
+                      description: MinCpu is the minimum allowed CPU limit in millicores
+                      format: int64
+                      type: integer
+                    minMemory:
+                      description: MinMemory is the minimum allowed Memory limit in
+                        bytes
+                      format: int64
+                      type: integer
                     optimizationScore:
+                      description: OptimizationScore is the score of the recommendation
                       type: number
                     recommendedLimit:
+                      description: RecommendedLimit contains the recommended resource
+                        limits
                       properties:
                         cpu:
                           format: int64
@@ -562,6 +591,10 @@ spec:
                   - PodUpdate
                   type: string
                 type: array
+              enableInClusterMpa:
+                description: EnableInClusterMpa indicates if the In-Cluster MPA (Fast
+                  Reaction) controller should manage this workload
+                type: boolean
               kedaScaledObjects:
                 description: KEDAScaledObjects contains the list of KEDA scaling configuration
                   recommendations
@@ -643,11 +676,22 @@ spec:
                 - Foreground
                 - Background
                 type: string
+              maxReplicas:
+                description: MaxReplicas is the maximum allowed replica count
+                format: int32
+                type: integer
+              minReplicas:
+                description: MinReplicas is the minimum allowed replica count
+                format: int32
+                type: integer
               name:
                 description: Name is the name of the target workload
                 type: string
               namespace:
                 description: Namespace is the namespace of the target workload
+                type: string
+              primaryMetric:
+                description: PrimaryMetric is the primary metric used for HPA scaling
                 type: string
               priority:
                 description: Priority determines the order of applying recommendations
@@ -669,6 +713,11 @@ spec:
                 description: SchedulerName is the name for the custom scheduler this
                   workload should be scheduled by
                 type: string
+              targetUtilization:
+                description: TargetUtilization is the target average utilization for
+                  the primary metric (percentage)
+                format: int32
+                type: integer
               useLiveMigration:
                 description: UseLiveMigration determines if this recommendation should
                   be applied through live migration

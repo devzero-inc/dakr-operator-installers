@@ -138,10 +138,13 @@ spec:
           mountPath: /var/lib/rancher/
         - name: host-proc
           mountPath: /proc
-          readOnly: true
+          readOnly: false
         - name: host-sys
           mountPath: /sys
           readOnly: true
+        - name: hostroot
+          mountPath: /host
+          readOnly: false  # Must be writable for P2P snapshot import (overlayfs upperdir/workdir)
         # - name: tls-certs
         #   mountPath: /tls
         #   readOnly: true
