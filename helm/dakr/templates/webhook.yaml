@@ -48,4 +48,63 @@ webhooks:
     sideEffects: None
     timeoutSeconds: 2
     failurePolicy: Ignore
+---
+{{- if and .Values.webhook.validator.enabled .Values.operator.enabled }}
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: {{ include "dakr.fullname" . }}-validator
+  labels:
+    {{- include "dakr.labels" . | nindent 4 }}
+webhooks:
+  - name: workload-validator.dakr.devzero.io
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: NotIn
+          values:
+            - kube-system
+            - {{ .Release.Namespace }}
+    rules:
+      - apiGroups: ["apps"]
+        apiVersions: ["v1"]
+        operations: ["UPDATE"]
+        resources: ["deployments", "statefulsets", "daemonsets", "replicasets"]
+        scope: "*"
+      - apiGroups: ["batch"]
+        apiVersions: ["v1"]
+        operations: ["UPDATE"]
+        resources: ["jobs", "cronjobs"]
+        scope: "*"
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["UPDATE"]
+        resources: ["pods", "replicationcontrollers"]
+        scope: "*"
+      {{- if .Capabilities.APIVersions.Has "argoproj.io/v1alpha1/Rollout" }}
+      - apiGroups: ["argoproj.io"]
+        apiVersions: ["v1alpha1"]
+        operations: ["UPDATE"]
+        resources: ["rollouts"]
+        scope: "*"
+      {{- end }}
+      {{- if .Capabilities.APIVersions.Has "kubeflow.org/v1/Notebook" }}
+      - apiGroups: ["kubeflow.org"]
+        apiVersions: ["v1"]
+        operations: ["UPDATE"]
+        resources: ["notebooks"]
+        scope: "*"
+      {{- end }}
+    clientConfig:
+      service:
+        namespace: {{ .Release.Namespace }}
+        name: {{ include "dakr.fullname" . }}-operator
+        path: /validate
+        port: {{ .Values.operator.port | default 9443 }}
+      caBundle: {{ .Values.webhook.caBundle }}
+    admissionReviewVersions: ["v1"]
+    sideEffects: None
+    timeoutSeconds: 5
+    failurePolicy: {{ .Values.webhook.validator.failurePolicy | default "Fail" }}
+{{- end }}
 {{- end }} 

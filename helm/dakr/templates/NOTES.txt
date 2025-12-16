@@ -5,8 +5,8 @@ Your release is named {{ .Release.Name }}.
 
 To learn more about the release, try:
 
-  $ helm status {{ .Release.Name }}
-  $ helm get all {{ .Release.Name }}
+  $ helm status {{ .Release.Name }} -n {{ .Release.Namespace }}
+  $ helm get all {{ .Release.Name }} -n {{ .Release.Namespace }}
 
 {{- if and (not .Values.operator.clusterToken) (not .Values.operator.tokenFromSecret) (not .Values.operator.tokenFromConfigMap) }}
 
@@ -68,12 +68,17 @@ Run the appropriate Terraform module in terraform/{{ .Values.cloud }}/ to create
 
 {{- if .Values.webhook.enabled }}
 
-The DAKR admission webhook has been enabled.
+The DAKR mutating admission webhook has been enabled.
+{{- if .Values.webhook.validator.enabled }}
+The DAKR validating webhook has been enabled for enhanced security.
+{{- end }}
 {{- end }}
 
 {{- if .Values.agent.enabled }}
 
-The DAKR agent DaemonSet has been deployed to all nodes.
+Label nodes that will support live migration. This enables the checkpoint/restore functionality on those nodes (to see the nodes in the cluster, run kubectl get nodes).
+
+  $ kubectl label node <node-name> dakr.devzero.io/checkpoint-node=true
 {{- end }}
 
 {{- if .Values.runtimeConfig.enabled }}

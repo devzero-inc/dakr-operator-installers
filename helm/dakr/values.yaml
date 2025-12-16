@@ -8,18 +8,21 @@ cloud: ""
 # Priority Class configuration for critical workloads
 # This ensures all DAKR components are not evicted under resource pressure
 priorityClass:
-  enabled: true  # Enable/disable creation of priority class
-  value: 1000000000  # Highest priority value
-  preemptionPolicy: PreemptLowerPriority  # Can preempt lower priority pods
+  enabled: true # Enable/disable creation of priority class
+  value: 1000000000 # Highest priority value
+  preemptionPolicy: PreemptLowerPriority # Can preempt lower priority pods
 
 image:
   repository: docker.io/devzeroinc
   # This sets the pull policy for images.
-  pullPolicy: Always 
+  pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "v0.0.42"
+  tag: "v0.0.43"
 
 imagePullSecrets: []
+
+mpaController:
+  enabled: false
 
 operator:
   enabled: true
@@ -28,7 +31,7 @@ operator:
   # Pod Disruption Budget configuration
   podDisruptionBudget:
     enabled: true
-    minAvailable: 1  # or use maxUnavailable: 1
+    minAvailable: 1 # or use maxUnavailable: 1
     # maxUnavailable: 1  # Alternative to minAvailable
     # unhealthyPodEvictionPolicy: IfHealthyBudget  # Optional: IfHealthyBudget, AlwaysAllow
   # IMPORTANT: When using Secrets for token configuration, note that Secrets cannot be accessed across namespaces.
@@ -41,13 +44,15 @@ operator:
       cpu: 10m
       memory: 64Mi
   endpoint: "https://dakr.devzero.io"
+  zxporterAddr: "zxporter-mpa.devzero-zxporter.svc.cluster.local:50051"
   logLevel: "info"
-  clusterToken: "" # Required: Authentication token for DAKR control plane. If empty, the operator will attempt to read from Secret or ConfigMap below.
-                   # If set to a non-empty string, this value will be used directly.
+  clusterToken:
+    "" # Required: Authentication token for DAKR control plane. If empty, the operator will attempt to read from Secret or ConfigMap below.
+    # If set to a non-empty string, this value will be used directly.
   clusterName: "" # Required: Unique identifier for this Kubernetes cluster. If empty, the operator will attempt to read from the ConfigMap below.
-                  # If set to a non-empty string, this value will be used directly.
-  clusterLocation: ""  # Required: Cloud region/zone where the cluster is running (e.g., us-west-2, europe-west1-b)
-  # noCloudCreds: true # If true, operator will not attempt to perform node scaling operations, and will not require cloud credentials
+    # If set to a non-empty string, this value will be used directly.
+  clusterLocation: "" # Required: Cloud region/zone where the cluster is running (e.g., us-west-2, europe-west1-b)
+  noCloudCreds: true # If true, operator will not attempt to perform node scaling operations, and will not require cloud credentials
   # tokenFromSecret: # If clusterToken is not specified above, operator will read from below Secret value (higher priority than ConfigMap)
   #   name: "devzero-zxporter-token"      # Name of the Secret (must be in the same namespace as the operator)
   #   key: "CLUSTER_TOKEN"                # Key in the Secret's data to get the token
@@ -56,8 +61,8 @@ operator:
   #   # the Secret must be recreated in the operator's namespace. Alternatively, install both in the same namespace.
   # tokenFromConfigMap: # If clusterToken is not specified above and not found in Secret, operator will read from below ConfigMap value
   #   name: "devzero-zxporter-env-config" # Name of the ConfigMap
-  #   namespace: "devzero-zxporter"       # Namespace of the ConfigMap
-  #   key: "CLUSTER_TOKEN"                # Key in the ConfigMap's data to get the token
+  #   namespace: "devzero-zxporter" # Namespace of the ConfigMap
+  #   key: "CLUSTER_TOKEN" # Key in the ConfigMap's data to get the token
   # nameFromConfigMap: # If clusterName is not specified above and not found in Secret, operator will read from below ConfigMap value
   #   name: "devzero-zxporter-env-config" # Name of the ConfigMap
   #   namespace: "devzero-zxporter"       # Namespace of the ConfigMap
@@ -67,7 +72,7 @@ operator:
   debugPort: 8082
   features:
     argocdPatching: false # if set, the operator will patch argo applications to ignore differences from the dakr operator
-    workloadRecBatchSize: 1 # needs to be >=1; determines batch size of pulling down workload recommendations from control plane, before being persisted as CRDs 
+    workloadRecBatchSize: 1 # needs to be >=1; determines batch size of pulling down workload recommendations from control plane, before being persisted as CRDs
     nodeGroupRecBatchSize: 1 # needs to be >=1; determines batch size of pulling down node group recommendations from control plane, before being persisted as CRDs
   # Runtime directories to include in live migration checkpoint operations
   # These directories will be passed to the live migration service for CRIU checkpoint operations
@@ -104,7 +109,8 @@ operator:
     #   "iam.gke.io/gcp-service-account": "your-gcp-sa-email@your-gcp-project-id.iam.gserviceaccount.com"
     # Azure:
     #   "azure.workload.identity/client-id": "YOUR_USER_ASSIGNED_IDENTITY_CLIENT_ID"
-    annotations: {}
+    annotations:
+      {}
       # Replace with the appropriate key-value pair from your Terraform output
       # (see instructions above).
       # Example for AWS:
@@ -113,6 +119,17 @@ operator:
       # "iam.gke.io/gcp-service-account": "dakr-operator-sa@project-id.iam.gserviceaccount.com"
       # Example for Azure:
       # "azure.workload.identity/client-id": "12345678-1234-1234-1234-123456789012"
+
+  # RBAC security configuration
+  rbac:
+    # Enable hardened RBAC permissions 
+    hardened: true
+    # Allow dangerous permissions for testing/development (NOT recommended for production)
+    allowDangerousPermissions:
+      escalateClusterRoles: true  # Allow modifying ClusterRoles
+      deleteNodes: true           # Allow deleting nodes
+      createDeletePods: true      # Allow creating/deleting pods
+      createPriorityClasses: true # Allow creating priority classes 
 
 scheduler:
   image:
@@ -160,24 +177,49 @@ agent:
   configureInotify: true
   # inotify configuration for CRIU
   inotify:
-    maxUserInstances: 4096  # Minimum number of inotify instances
-    maxUserWatches: 524288  # Minimum number of inotify watches
-    instancesPath: "/host/proc/sys/fs/inotify/max_user_instances"  # Path to max_user_instances
-    watchesPath: "/host/proc/sys/fs/inotify/max_user_watches"  # Path to max_user_watches
+    maxUserInstances: 4096 # Minimum number of inotify instances
+    maxUserWatches: 524288 # Minimum number of inotify watches
+    instancesPath: "/host/proc/sys/fs/inotify/max_user_instances" # Path to max_user_instances
+    watchesPath: "/host/proc/sys/fs/inotify/max_user_watches" # Path to max_user_watches
 
 webhook:
   enabled: true
-  caBundle: ""  # Base64 encoded CA bundle for webhook
+  caBundle: "" # Base64 encoded CA bundle for webhook
+  
+  # Validating admission webhook for DAKR security
+  # NOTE: Requires Kubernetes 1.16+ with admission controllers enabled
+  validator:
+    enabled: true # Enable validating webhook for security
+    failurePolicy: Fail # Fail-closed for security (Fail/Ignore)
+    
+    # Configure which fields DAKR is allowed to modify
+    allowedFields:
+      containerResources: true  # Allow modifying CPU/memory requests and limits
+      replicaCount: true       # Allow scaling workloads up/down
+      schedulerName: true      # Allow changing scheduler for workload placement
+      runtimeClassName: true  # Allow changing runtime class
+      dakrLabels: true        # Allow DAKR to manage its own labels/annotations
+      
+    # Resource limits for security
+    resourceLimits:
+      maxCpu: "1000"       # Maximum CPU limit (1000 cores for large compute workloads)
+      maxMemory: "100Ti"   # Maximum memory limit (100TB for large memory workloads)
+      maxReplicas: 10000   # Maximum replica count (10k replicas for massive scale)
+      
+    # Audit configuration
+    audit:
+      enabled: true     # Enable audit logging
+      logDenials: true  # Log denied requests for security monitoring
 
 # Runtime Configuration
 # Modular tool for configuring container runtimes (containerd, CRI-O, Docker, etc.)
 # Includes registry mirror configuration, and can be extended with storage, network, security modules
 runtimeConfig:
-  enabled: false  # Set to true to enable runtime configuration
+  enabled: false # Set to true to enable runtime configuration
   image: dakr-runtime-config
 
   # Container runtime to configure
-  runtime: containerd  # containerd, cri-o (future), docker (future)
+  runtime: containerd # containerd, cri-o (future), docker (future)
 
   # Runtime-specific paths
   runtimeConfigPath: /etc/containerd/config.toml
@@ -193,7 +235,7 @@ runtimeConfig:
 
   # Node targeting
   nodeSelector:
-    mode: all  # "all" or "labeled"
+    mode: all # "all" or "labeled"
     # When mode=labeled, specify labels to match
     labels: {}
     # Example:
@@ -209,23 +251,23 @@ runtimeConfig:
   # Pull-through cache for accelerating image pulls using Zot registry
   # Zot is a lightweight OCI-native registry that can mirror multiple upstream registries
   registryMirrors:
-    enabled: false  # Set to true to enable registry mirror deployment
+    enabled: false # Set to true to enable registry mirror deployment
 
     # Zot-specific configuration
     zot:
-      tag: "v2.1.10"  # Zot image tag
-      logLevel: "info"  # Log level for Zot registry. Options: debug, info, warn, error
+      tag: "v2.1.10" # Zot image tag
+      logLevel: "info" # Log level for Zot registry. Options: debug, info, warn, error
 
     # Service configuration for Zot registry
     service:
       registryPort: 5000
-      nodePort: 30500  # Single NodePort for all registries (uses path-based routing)
+      nodePort: 30500 # Single NodePort for all registries (uses path-based routing)
 
     # Persistence settings for Zot
     persistence:
-      enabled: false  # Set to true to use PersistentVolumes (recommended for production)
-      storageClass: ""  # Leave empty to use default storage class
-      size: 20Gi  # Total storage size for all cached registries
+      enabled: false # Set to true to use PersistentVolumes (recommended for production)
+      storageClass: "" # Leave empty to use default storage class
+      size: 20Gi # Total storage size for all cached registries
 
     # Resource limits for Zot pod
     resources:
@@ -240,8 +282,8 @@ runtimeConfig:
     # Credentials are automatically generated from registry credentials below
     # Or you can provide your own secret with credentials.json
     credentialsSecret:
-      existingSecret: ""  # Set to use existing secret instead of auto-generated one
-      key: "credentials.json"  # Key in the secret containing credentials.json
+      existingSecret: "" # Set to use existing secret instead of auto-generated one
+      key: "credentials.json" # Key in the secret containing credentials.json
 
     # Registry mirror definitions
     registries:
