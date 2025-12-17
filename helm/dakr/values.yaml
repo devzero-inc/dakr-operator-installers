@@ -48,12 +48,8 @@ operator:
   # Log level for the operator. Available levels:
   # - debug: Most verbose, includes debug messages
   # - info: Informational messages
-  # - warn: Warning messages (default)
   # - error: Error messages only
-  # - dpanic: Development panic level (panics in development, errors in production)
-  # - panic: Panic level
-  # - fatal: Fatal level
-  logLevel: "warn"
+  logLevel: "error"
   clusterToken:
     "" # Required: Authentication token for DAKR control plane. If empty, the operator will attempt to read from Secret or ConfigMap below.
     # If set to a non-empty string, this value will be used directly.
@@ -192,9 +188,8 @@ agent:
   # Log level for the agent. Available levels:
   # - debug: Most verbose, includes debug messages
   # - info: Informational messages
-  # - warn: Warning messages (default)
   # - error: Error messages only
-  logLevel: "warn"
+  logLevel: "error"
   resources:
     requests:
       cpu: 100m
@@ -323,9 +318,8 @@ runtimeConfig:
       # Log level for Zot registry. Available levels:
       # - debug: Most verbose, includes debug messages
       # - info: Informational messages
-      # - warn: Warning messages (default)
       # - error: Error messages only
-      logLevel: "warn"
+      logLevel: "error"
 
     # Service configuration for Zot registry
     service:
