@@ -29,25 +29,18 @@ spec:
       {{- if .Values.priorityClass.enabled }}
       priorityClassName: {{ include "dakr.fullname" . }}-critical
       {{- end }}
+      {{- with .Values.agent.nodeSelector }}
       nodeSelector:
-        dakr.devzero.io/checkpoint-node: "true"
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.agent.tolerations }}
       tolerations:
-        - effect: NoSchedule
-          operator: Exists
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.agent.affinity }}
       affinity:
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-              - matchExpressions:
-                - key: kubernetes.io/arch
-                  operator: In
-                  values:
-                    - amd64
-                    - arm64
-                - key: kubernetes.io/os
-                  operator: In
-                  values:
-                    - linux
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       initContainers:
       - name: installer
         image: "{{ .Values.image.repository }}/{{ .Values.agent.installerImage }}:{{ .Values.image.tag }}"
@@ -96,7 +89,7 @@ spec:
         command: ["./node"]
         args:
         - --addr={{ .Values.agent.port | default 8090  }}
-        - --debug={{ .Values.agent.debug | default false  }}
+        - --log-level={{ .Values.agent.logLevel | default "warn" }}
         - --containerd-sock={{ .Values.agent.containerdSock | default "/run/containerd/containerd.sock" }}
         - --checkpoint-kubelet-logs={{ .Values.agent.checkpointKubeletLogs | default true }}
         ports:

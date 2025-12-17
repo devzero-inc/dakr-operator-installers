@@ -23,7 +23,7 @@ data:
         "port": "{{ $.Values.runtimeConfig.registryMirrors.service.registryPort }}"
       },
       "log": {
-        "level": "{{ $.Values.runtimeConfig.registryMirrors.zot.logLevel | default "info" }}"
+        "level": "{{ $.Values.runtimeConfig.registryMirrors.zot.logLevel | default "warn" }}"
       },
       "extensions": {
         "sync": {
