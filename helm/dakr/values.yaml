@@ -17,7 +17,7 @@ image:
   # This sets the pull policy for images.
   pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "v0.0.44"
+  tag: "v0.0.45"
 
 imagePullSecrets: []
 
@@ -45,7 +45,15 @@ operator:
       memory: 64Mi
   endpoint: "https://dakr.devzero.io"
   zxporterAddr: "zxporter-mpa.devzero-zxporter.svc.cluster.local:50051"
-  logLevel: "info"
+  # Log level for the operator. Available levels:
+  # - debug: Most verbose, includes debug messages
+  # - info: Informational messages
+  # - warn: Warning messages (default)
+  # - error: Error messages only
+  # - dpanic: Development panic level (panics in development, errors in production)
+  # - panic: Panic level
+  # - fatal: Fatal level
+  logLevel: "warn"
   clusterToken:
     "" # Required: Authentication token for DAKR control plane. If empty, the operator will attempt to read from Secret or ConfigMap below.
     # If set to a non-empty string, this value will be used directly.
@@ -129,7 +137,28 @@ operator:
       escalateClusterRoles: true  # Allow modifying ClusterRoles
       deleteNodes: true           # Allow deleting nodes
       createDeletePods: true      # Allow creating/deleting pods
-      createPriorityClasses: true # Allow creating priority classes 
+      createPriorityClasses: true # Allow creating priority classes
+
+  # Pod scheduling configuration
+  nodeSelector:
+    kubernetes.io/os: linux
+  tolerations:
+    - effect: NoSchedule
+      operator: Exists
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+            - key: kubernetes.io/arch
+              operator: In
+              values:
+                - amd64
+                - arm64
+            - key: kubernetes.io/os
+              operator: In
+              values:
+                - linux 
 
 scheduler:
   image:
@@ -147,11 +176,25 @@ scheduler:
     #   namespace: "devzero-zxporter"       # Namespace of the ConfigMap
     #   key: "CLUSTER_TOKEN"                # Key in the ConfigMap's data to get the token
 
+  # Pod scheduling configuration
+  nodeSelector:
+    kubernetes.io/os: linux
+  tolerations:
+    - effect: NoSchedule
+      operator: Exists
+  affinity: {}
+
 agent:
   enabled: false
   nodeImage: dakr-agent
   installerImage: dakr-shim-installer
   criuImage: dakr-criu
+  # Log level for the agent. Available levels:
+  # - debug: Most verbose, includes debug messages
+  # - info: Informational messages
+  # - warn: Warning messages (default)
+  # - error: Error messages only
+  logLevel: "warn"
   resources:
     requests:
       cpu: 100m
@@ -181,6 +224,27 @@ agent:
     maxUserWatches: 524288 # Minimum number of inotify watches
     instancesPath: "/host/proc/sys/fs/inotify/max_user_instances" # Path to max_user_instances
     watchesPath: "/host/proc/sys/fs/inotify/max_user_watches" # Path to max_user_watches
+
+  # Pod scheduling configuration
+  nodeSelector:
+    dakr.devzero.io/checkpoint-node: "true"
+  tolerations:
+    - effect: NoSchedule
+      operator: Exists
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+            - key: kubernetes.io/arch
+              operator: In
+              values:
+                - amd64
+                - arm64
+            - key: kubernetes.io/os
+              operator: In
+              values:
+                - linux
 
 webhook:
   enabled: true
@@ -256,7 +320,12 @@ runtimeConfig:
     # Zot-specific configuration
     zot:
       tag: "v2.1.10" # Zot image tag
-      logLevel: "info" # Log level for Zot registry. Options: debug, info, warn, error
+      # Log level for Zot registry. Available levels:
+      # - debug: Most verbose, includes debug messages
+      # - info: Informational messages
+      # - warn: Warning messages (default)
+      # - error: Error messages only
+      logLevel: "warn"
 
     # Service configuration for Zot registry
     service:
@@ -277,6 +346,11 @@ runtimeConfig:
       limits:
         cpu: 100m
         memory: 256Mi
+
+    # Pod scheduling configuration for Zot registry
+    nodeSelector: {}
+    tolerations: []
+    affinity: {}
 
     # Credentials Secret Configuration
     # Credentials are automatically generated from registry credentials below

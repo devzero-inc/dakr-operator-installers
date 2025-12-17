@@ -25,6 +25,18 @@ spec:
         checksum/credentials: {{ include (print $.Template.BasePath "/zot-credentials-secret.yaml") . | sha256sum }}
         {{- end }}
     spec:
+      {{- with .Values.runtimeConfig.registryMirrors.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.runtimeConfig.registryMirrors.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.runtimeConfig.registryMirrors.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
       - name: zot
         image: ghcr.io/project-zot/zot-linux-amd64:{{ .Values.runtimeConfig.registryMirrors.zot.tag | default "v2.1.1" }}
