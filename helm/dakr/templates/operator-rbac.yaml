@@ -135,23 +135,23 @@ rules:
 # Karpenter core resources
 - apiGroups: ["karpenter.sh"]
   resources: ["machines", "nodeclaims", "nodepools", "provisioners"]
-  verbs: ["get", "list", "watch", "update", "patch"]
+  verbs: ["get", "list", "watch", "update", "patch", "create", "delete"]
 # AWS Karpenter resources
 - apiGroups: ["karpenter.k8s.aws"]
   resources: ["awsnodetemplates", "ec2nodeclasses"]
-  verbs: ["get", "list", "watch", "update", "patch"]
+  verbs: ["get", "list", "watch", "update", "patch", "create", "delete"]
 # Azure Karpenter resources
 - apiGroups: ["karpenter.azure.com"]
   resources: ["aksnodeclasses"]
-  verbs: ["get", "list", "watch", "update", "patch"]
+  verbs: ["get", "list", "watch", "update", "patch", "create", "delete"]
 # GCP Karpenter resources
 - apiGroups: ["karpenter.k8s.gcp"]
   resources: ["gcenodeclasses"]
-  verbs: ["get", "list", "watch", "update", "patch"]
+  verbs: ["get", "list", "watch", "update", "patch", "create", "delete"]
 # Oracle Karpenter resources
 - apiGroups: ["karpenter.k8s.oracle"]
   resources: ["ocinodeclasses"]
-  verbs: ["get", "list", "watch", "update", "patch"]
+  verbs: ["get", "list", "watch", "update", "patch", "create", "delete"]
 {{- if .Capabilities.APIVersions.Has "keda.sh/v1alpha1/ScaledObject" }}
 # KEDA resources
 - apiGroups: ["keda.sh"]

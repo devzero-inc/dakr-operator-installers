@@ -248,7 +248,7 @@ webhook:
   # Validating admission webhook for DAKR security
   # NOTE: Requires Kubernetes 1.16+ with admission controllers enabled
   validator:
-    enabled: true # Enable validating webhook for security
+    enabled: false # Enable validating webhook for security
     failurePolicy: Fail # Fail-closed for security (Fail/Ignore)
     
     # Configure which fields DAKR is allowed to modify
