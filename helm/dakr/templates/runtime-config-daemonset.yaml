@@ -57,6 +57,10 @@ spec:
         {{- end }}
         - --mode=configure
         - --timeout={{ .Values.runtimeConfig.timeout }}
+        {{- with .Values.runtimeConfig.resources }}
+        resources:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
         securityContext:
           privileged: true
         volumeMounts:

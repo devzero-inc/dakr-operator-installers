@@ -478,9 +478,10 @@ spec:
             path: /healthz
             port: 10259
             scheme: HTTPS
+        {{- with .Values.scheduler.resources }}
         resources:
-          requests:
-            cpu: "200m"
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
         securityContext:
           privileged: false
         volumeMounts:

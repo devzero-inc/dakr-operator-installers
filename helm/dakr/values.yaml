@@ -17,7 +17,7 @@ image:
   # This sets the pull policy for images.
   pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "v0.0.45"
+  tag: "v0.0.46"
 
 imagePullSecrets: []
 
@@ -113,8 +113,7 @@ operator:
     #   "iam.gke.io/gcp-service-account": "your-gcp-sa-email@your-gcp-project-id.iam.gserviceaccount.com"
     # Azure:
     #   "azure.workload.identity/client-id": "YOUR_USER_ASSIGNED_IDENTITY_CLIENT_ID"
-    annotations:
-      {}
+    annotations: {}
       # Replace with the appropriate key-value pair from your Terraform output
       # (see instructions above).
       # Example for AWS:
@@ -126,13 +125,13 @@ operator:
 
   # RBAC security configuration
   rbac:
-    # Enable hardened RBAC permissions 
+    # Enable hardened RBAC permissions
     hardened: true
     # Allow dangerous permissions for testing/development (NOT recommended for production)
     allowDangerousPermissions:
-      escalateClusterRoles: true  # Allow modifying ClusterRoles
-      deleteNodes: true           # Allow deleting nodes
-      createDeletePods: true      # Allow creating/deleting pods
+      escalateClusterRoles: true # Allow modifying ClusterRoles
+      deleteNodes: true # Allow deleting nodes
+      createDeletePods: true # Allow creating/deleting pods
       createPriorityClasses: true # Allow creating priority classes
 
   # Pod scheduling configuration
@@ -146,15 +145,15 @@ operator:
       requiredDuringSchedulingIgnoredDuringExecution:
         nodeSelectorTerms:
           - matchExpressions:
-            - key: kubernetes.io/arch
-              operator: In
-              values:
-                - amd64
-                - arm64
-            - key: kubernetes.io/os
-              operator: In
-              values:
-                - linux 
+              - key: kubernetes.io/arch
+                operator: In
+                values:
+                  - amd64
+                  - arm64
+              - key: kubernetes.io/os
+                operator: In
+                values:
+                  - linux
 
 scheduler:
   image:
@@ -179,6 +178,14 @@ scheduler:
     - effect: NoSchedule
       operator: Exists
   affinity: {}
+  # Resource configuration for scheduler
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 400m
+      memory: 512Mi
 
 agent:
   enabled: false
@@ -231,44 +238,52 @@ agent:
       requiredDuringSchedulingIgnoredDuringExecution:
         nodeSelectorTerms:
           - matchExpressions:
-            - key: kubernetes.io/arch
-              operator: In
-              values:
-                - amd64
-                - arm64
-            - key: kubernetes.io/os
-              operator: In
-              values:
-                - linux
+              - key: kubernetes.io/arch
+                operator: In
+                values:
+                  - amd64
+                  - arm64
+              - key: kubernetes.io/os
+                operator: In
+                values:
+                  - linux
 
 webhook:
   enabled: true
   caBundle: "" # Base64 encoded CA bundle for webhook
-  
+  # Resource configuration for webhook certificate generation jobs
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
   # Validating admission webhook for DAKR security
   # NOTE: Requires Kubernetes 1.16+ with admission controllers enabled
   validator:
     enabled: false # Enable validating webhook for security
     failurePolicy: Fail # Fail-closed for security (Fail/Ignore)
-    
+
     # Configure which fields DAKR is allowed to modify
     allowedFields:
-      containerResources: true  # Allow modifying CPU/memory requests and limits
-      replicaCount: true       # Allow scaling workloads up/down
-      schedulerName: true      # Allow changing scheduler for workload placement
-      runtimeClassName: true  # Allow changing runtime class
-      dakrLabels: true        # Allow DAKR to manage its own labels/annotations
-      
+      containerResources: true # Allow modifying CPU/memory requests and limits
+      replicaCount: true # Allow scaling workloads up/down
+      schedulerName: true # Allow changing scheduler for workload placement
+      runtimeClassName: true # Allow changing runtime class
+      dakrLabels: true # Allow DAKR to manage its own labels/annotations
+
     # Resource limits for security
     resourceLimits:
-      maxCpu: "1000"       # Maximum CPU limit (1000 cores for large compute workloads)
-      maxMemory: "100Ti"   # Maximum memory limit (100TB for large memory workloads)
-      maxReplicas: 10000   # Maximum replica count (10k replicas for massive scale)
-      
+      maxCpu: "1000" # Maximum CPU limit (1000 cores for large compute workloads)
+      maxMemory: "100Ti" # Maximum memory limit (100TB for large memory workloads)
+      maxReplicas: 10000 # Maximum replica count (10k replicas for massive scale)
+
     # Audit configuration
     audit:
-      enabled: true     # Enable audit logging
-      logDenials: true  # Log denied requests for security monitoring
+      enabled: true # Enable audit logging
+      logDenials: true # Log denied requests for security monitoring
 
 # Runtime Configuration
 # Modular tool for configuring container runtimes (containerd, CRI-O, Docker, etc.)
@@ -305,6 +320,15 @@ runtimeConfig:
   tolerations:
     - effect: NoSchedule
       operator: Exists
+
+  # Resource configuration for runtime-config init container
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 20m
+      memory: 64Mi
 
   # Registry Mirror Module Configuration
   # Pull-through cache for accelerating image pulls using Zot registry
