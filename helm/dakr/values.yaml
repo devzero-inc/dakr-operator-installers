@@ -17,7 +17,7 @@ image:
   # This sets the pull policy for images.
   pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "v0.0.46"
+  tag: "v0.0.47"
 
 imagePullSecrets: []
 
@@ -133,6 +133,10 @@ operator:
       deleteNodes: true # Allow deleting nodes
       createDeletePods: true # Allow creating/deleting pods
       createPriorityClasses: true # Allow creating priority classes
+    # Allow generic resource creation permissions
+    # These are opt-in permissions for the operator to create additional Kubernetes resources
+    allowGenericResourceCreation:
+      podDisruptionBudgets: false # Allow creating PodDisruptionBudgets for workloads (disabled by default)
 
   # Pod scheduling configuration
   nodeSelector:

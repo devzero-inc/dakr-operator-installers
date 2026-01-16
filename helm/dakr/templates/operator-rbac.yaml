@@ -84,13 +84,13 @@ rules:
   verbs: ["get", "list", "watch", "create", "update", "patch"]
 # DAKR custom resources
 - apiGroups: ["dakr.devzero.io"]
-  resources: ["workloadrecommendations", "nodegrouprecommendations"]
+  resources: ["workloadrecommendations", "nodegrouprecommendations", "genericresourcerecommendations"]
   verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 - apiGroups: ["dakr.devzero.io"]
-  resources: ["workloadrecommendations/status", "nodegrouprecommendations/status"]
+  resources: ["workloadrecommendations/status", "nodegrouprecommendations/status", "genericresourcerecommendations/status"]
   verbs: ["get", "update", "patch"]
 - apiGroups: ["dakr.devzero.io"]
-  resources: ["workloadrecommendations/finalizers", "nodegrouprecommendations/finalizers"]
+  resources: ["workloadrecommendations/finalizers", "nodegrouprecommendations/finalizers", "genericresourcerecommendations/finalizers"]
   verbs: ["update"]
 - apiGroups: ["dakr.devzero.io"]
   resources: ["checkpointrestores"]
@@ -128,6 +128,12 @@ rules:
     - "list"
     - "watch"
   {{- end }}
+# PodDisruptionBudget resources - configurable for generic resource recommendations
+{{- if .Values.operator.rbac.allowGenericResourceCreation.podDisruptionBudgets }}
+- apiGroups: ["policy"]
+  resources: ["poddisruptionbudgets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+{{- end }}
 # Node resources
 - apiGroups: ["node.k8s.io"]
   resources: ["runtimeclasses"]
