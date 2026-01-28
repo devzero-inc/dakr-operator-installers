@@ -13,7 +13,7 @@ priorityClass:
   preemptionPolicy: PreemptLowerPriority # Can preempt lower priority pods
 
 image:
-  repository: docker.io/devzeroinc
+  repository: public.ecr.aws/devzeroinc
   # This sets the pull policy for images.
   pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
