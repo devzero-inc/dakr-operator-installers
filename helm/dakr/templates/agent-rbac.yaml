@@ -107,6 +107,20 @@ rules:
   - patch
   - delete
 {{- end }}
+{{- if .Capabilities.APIVersions.Has "sparkoperator.k8s.io/v1beta2/SparkApplication" }}
+- apiGroups:
+  - sparkoperator.k8s.io
+  resources:
+  - sparkapplications
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+{{- end }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
