@@ -197,6 +197,15 @@ rules:
   resources: ["jobs/status"]
   verbs: ["get", "update", "patch", "delete", "create"]
 {{- end }}
+{{- if .Capabilities.APIVersions.Has "sparkoperator.k8s.io/v1beta2/SparkApplication" }}
+# Spark Operator resources
+- apiGroups: ["sparkoperator.k8s.io"]
+  resources: ["sparkapplications"]
+  verbs: ["get", "list", "watch", "update", "patch", "delete", "create"]
+- apiGroups: ["sparkoperator.k8s.io"]
+  resources: ["sparkapplications/status"]
+  verbs: ["get", "update", "patch"]
+{{- end }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
