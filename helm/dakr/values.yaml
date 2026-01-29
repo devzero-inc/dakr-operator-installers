@@ -44,7 +44,7 @@ operator:
       cpu: 10m
       memory: 64Mi
   endpoint: "https://dakr.devzero.io"
-  zxporterAddr: "zxporter-mpa.devzero-zxporter.svc.cluster.local:50051"
+  zxporterAddr: "devzero-zxporter-controller-manager-mpa.devzero-zxporter.svc.cluster.local:50051"
   # Log level for the operator. Available levels:
   # - debug: Most verbose, includes debug messages
   # - info: Informational messages
