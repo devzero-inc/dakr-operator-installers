@@ -17,7 +17,7 @@ image:
   # This sets the pull policy for images.
   pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "v0.0.48"
+  tag: "v0.0.49"
 
 imagePullSecrets: []
 
@@ -44,7 +44,7 @@ operator:
       cpu: 10m
       memory: 64Mi
   endpoint: "https://dakr.devzero.io"
-  zxporterAddr: "zxporter-mpa.devzero-zxporter.svc.cluster.local:50051"
+  zxporterAddr: "devzero-zxporter-controller-manager-mpa.devzero-zxporter.svc.cluster.local:50051"
   # Log level for the operator. Available levels:
   # - debug: Most verbose, includes debug messages
   # - info: Informational messages
@@ -78,9 +78,6 @@ operator:
     argocdPatching: false # if set, the operator will patch argo applications to ignore differences from the dakr operator
     workloadRecBatchSize: 1 # needs to be >=1; determines batch size of pulling down workload recommendations from control plane, before being persisted as CRDs
     nodeGroupRecBatchSize: 1 # needs to be >=1; determines batch size of pulling down node group recommendations from control plane, before being persisted as CRDs
-  # Runtime directories to include in live migration checkpoint operations
-  # These directories will be passed to the live migration service for CRIU checkpoint operations
-  runtimeDirs: []
   # Janitor configuration for periodic cleanup of old CRDs
   janitor:
     # Cleanup interval in minutes (default: 30)
@@ -141,10 +138,9 @@ operator:
   # Pod scheduling configuration
   nodeSelector:
     kubernetes.io/os: linux
-  tolerations:
-    - effect: NoSchedule
-      operator: Exists
+  tolerations: []
   affinity:
+
     nodeAffinity:
       requiredDuringSchedulingIgnoredDuringExecution:
         nodeSelectorTerms:
@@ -219,7 +215,7 @@ agent:
   # for containerd it is /run/containerd/containerd.sock
   containerdSock: "/run/containerd/containerd.sock"
   # disable io_uring on the node to prevent CRIU checkpoint failures
-  disableIOUring: false
+  disableIOUring: true
   # path to the io_uring_disabled sysctl parameter on the host
   ioUringPath: "/host/proc/sys/kernel/io_uring_disabled"
   # configure inotify limits for CRIU checkpoint operations

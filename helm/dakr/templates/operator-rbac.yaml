@@ -67,6 +67,14 @@ rules:
 - apiGroups: [""]
   resources: ["events"]
   verbs: ["create", "patch"]
+# Services - needed for service IP lookup during live migration
+- apiGroups: [""]
+  resources: ["services"]
+  verbs: ["get", "list", "watch"]
+# EndpointSlices - needed for service IP lookup during live migration
+- apiGroups: ["discovery.k8s.io"]
+  resources: ["endpointslices"]
+  verbs: ["get", "list", "watch"]
 # Apps resources (apps/v1)
 - apiGroups: ["apps"]
   resources: ["deployments", "statefulsets", "replicasets", "daemonsets"]
@@ -84,13 +92,13 @@ rules:
   verbs: ["get", "list", "watch", "create", "update", "patch"]
 # DAKR custom resources
 - apiGroups: ["dakr.devzero.io"]
-  resources: ["workloadrecommendations", "nodegrouprecommendations", "genericresourcerecommendations"]
+  resources: ["workloadrecommendations", "nodegrouprecommendations", "genericresourcerecommendations", "workloadrules"]
   verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 - apiGroups: ["dakr.devzero.io"]
-  resources: ["workloadrecommendations/status", "nodegrouprecommendations/status", "genericresourcerecommendations/status"]
+  resources: ["workloadrecommendations/status", "nodegrouprecommendations/status", "genericresourcerecommendations/status", "workloadrules/status"]
   verbs: ["get", "update", "patch"]
 - apiGroups: ["dakr.devzero.io"]
-  resources: ["workloadrecommendations/finalizers", "nodegrouprecommendations/finalizers", "genericresourcerecommendations/finalizers"]
+  resources: ["workloadrecommendations/finalizers", "nodegrouprecommendations/finalizers", "genericresourcerecommendations/finalizers", "workloadrules/finalizers"]
   verbs: ["update"]
 - apiGroups: ["dakr.devzero.io"]
   resources: ["checkpointrestores"]
