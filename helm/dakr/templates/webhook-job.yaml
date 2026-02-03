@@ -68,6 +68,7 @@ spec:
       containers:
         - name: cert-generator
           image: {{ .Values.image.repository }}/kubectl:latest
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
           {{- with .Values.webhook.resources }}
           resources:
             {{- toYaml . | nindent 12 }}
@@ -143,6 +144,7 @@ spec:
       containers:
         - name: webhook-patcher
           image: {{ .Values.image.repository }}/kubectl:latest
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
           {{- with .Values.webhook.resources }}
           resources:
             {{- toYaml . | nindent 12 }}

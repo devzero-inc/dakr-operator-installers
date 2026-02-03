@@ -55,6 +55,49 @@ spec:
             type: object
           spec:
             properties:
+              connections:
+                description: Connections captured at checkpoint time
+                items:
+                  description: |-
+                    Connection represents a TCP connection state captured at checkpoint time.
+                    Does not include newPodIP - that's only known at restore time.
+                  properties:
+                    localPort:
+                      description: LocalPort is the port on the pod being migrated
+                      type: integer
+                    originalDstIP:
+                      description: |-
+                        OriginalDstIP is the original destination IP that clients used (e.g., ClusterIP).
+                        When the pod is a server, this may differ from OriginalPodIP due to kube-proxy DNAT.
+                        We need this to create DNAT rules that match on the source node.
+                      type: string
+                    originalPodIP:
+                      description: |-
+                        OriginalPodIP is the pod IP from the FIRST migration in a chain.
+                        For the first migration, this equals the current pod IP.
+                        For chained migrations, this is the IP that external clients/servers know.
+                        NAT rules use this so DNAT goes: OriginalPodIP -> newPodIP (skipping intermediates)
+                      type: string
+                    remoteIP:
+                      description: RemoteIP is the peer's IP address (real backend
+                        for ClusterIP, direct peer for headless)
+                      type: string
+                    remotePort:
+                      description: RemotePort is the peer's port
+                      type: integer
+                    role:
+                      description: Role is "server" or "client" indicating pod's role
+                        in this connection
+                      type: string
+                  required:
+                  - localPort
+                  - originalPodIP
+                  - remoteIP
+                  - remotePort
+                  - role
+                  type: object
+                type: array
+                x-kubernetes-list-type: atomic
               containers:
                 description: Containers to be restored from checkpoint
                 items:
@@ -103,17 +146,29 @@ spec:
                 description: RecommendationID is the unique identifier from the dakr
                   service
                 type: string
+              serviceIP:
+                description: ServiceIP is the IP address of the service after restore
+                type: string
               sourceNode:
                 description: SourceNode where the checkpoint was created
                 type: string
               sourcePod:
                 description: SourcePod that was checkpointed
                 type: string
+              sourcePodIP:
+                description: |-
+                  SourcePodIP is the IP address of the source pod at checkpoint time
+                  Used for updating conntrack entries during restore to preserve TCP connections
+                type: string
               targetNode:
                 description: TargetNode where the checkpoint should be restored
                 type: string
               targetPod:
                 description: TargetPod where the checkpoint should be restored
+                type: string
+              targetPodIP:
+                description: TargetPodIP is the IP address of the target pod after
+                  restore
                 type: string
               workloadKind:
                 description: |-
@@ -873,6 +928,10 @@ spec:
               namespace:
                 description: Namespace is the namespace of the target workload
                 type: string
+              policyId:
+                description: PolicyID is the control plane's UUID for the policy that
+                  generated this recommendation
+                type: string
               primaryMetric:
                 description: PrimaryMetric is the primary metric used for HPA scaling
                 type: string
@@ -889,6 +948,10 @@ spec:
                 description: ReplicaCount is the recommended replica count
                 format: int32
                 type: integer
+              ruleId:
+                description: RuleID is the control plane's UUID for the WorkloadRule
+                  that generated this recommendation
+                type: string
               runtimeClassName:
                 description: RuntimeClassName is the runtime class name for the workload
                 type: string
@@ -905,6 +968,9 @@ spec:
                 description: UseLiveMigration determines if this recommendation should
                   be applied through live migration
                 type: boolean
+              workloadUid:
+                description: WorkloadUID is the Kubernetes UID of the target workload
+                type: string
             required:
             - kind
             - name
@@ -999,6 +1065,493 @@ spec:
                 - Skipped
                 - Migrating
                 type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.18.0
+  name: workloadrules.dakr.devzero.io
+spec:
+  group: dakr.devzero.io
+  names:
+    kind: WorkloadRule
+    listKind: WorkloadRuleList
+    plural: workloadrules
+    singular: workloadrule
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.phase
+      name: Status
+      type: string
+    - jsonPath: .spec.kind
+      name: Kind
+      type: string
+    - jsonPath: .spec.name
+      name: Workload
+      type: string
+    - jsonPath: .spec.generation
+      name: Generation
+      type: integer
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: WorkloadRule represents a set of rules for scaling a workload,
+          generated by the MPA v2 Rules Engine
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: WorkloadRuleSpec defines the desired state of a WorkloadRule
+            properties:
+              actionTriggers:
+                description: ActionTriggers contains the list of action triggers for
+                  the rule
+                items:
+                  description: ActionTrigger represents a trigger for an action
+                  enum:
+                  - OnDetection
+                  - Immediate
+                  type: string
+                type: array
+              classification:
+                description: Workload classification (dominance + burstiness)
+                properties:
+                  burstiness:
+                    description: Burstiness contains p95/p50 ratios per resource axis
+                    properties:
+                      cpu:
+                        type: string
+                      disk:
+                        type: string
+                      memory:
+                        type: string
+                      network:
+                        type: string
+                    type: object
+                  dominantResource:
+                    description: DominantResource is the resource axis this workload
+                      is heaviest on
+                    enum:
+                    - cpu
+                    - memory
+                    - gpu
+                    - network
+                    - disk
+                    - unknown
+                    type: string
+                type: object
+              confidenceScore:
+                description: ConfidenceScore indicates the confidence level of this
+                  rule (0.0-1.0)
+                type: string
+              cpuRule:
+                description: CPU Rule Configuration
+                properties:
+                  baseRequest:
+                    description: BaseRequest is the base resource request value (e.g.,
+                      "500m" for CPU or "1Gi" for memory)
+                    type: string
+                  enabled:
+                    description: Enabled indicates if this resource rule is active
+                    type: boolean
+                  limitMultiplier:
+                    description: LimitMultiplier is the multiplier to calculate limits
+                      from requests (e.g., "1.5")
+                    type: string
+                  limitsAdjustmentEnabled:
+                    description: LimitsAdjustmentEnabled indicates if limits should
+                      be adjusted alongside requests
+                    type: boolean
+                  maxRequest:
+                    description: MaxRequest is the maximum allowed resource request
+                    type: string
+                  maxScaleDownPercent:
+                    description: MaxScaleDownPercent is the maximum percentage decrease
+                      allowed per scaling event (e.g., "0.5" for 50%)
+                    type: string
+                  maxScaleUpPercent:
+                    description: MaxScaleUpPercent is the maximum percentage increase
+                      allowed per scaling event (e.g., "1.0" for 100%)
+                    type: string
+                  minRequest:
+                    description: MinRequest is the minimum allowed resource request
+                    type: string
+                  targetPercentile:
+                    description: TargetPercentile is the target percentile for resource
+                      recommendations (e.g., "0.75" for P75)
+                    type: string
+                required:
+                - enabled
+                type: object
+              cronSchedule:
+                description: CronSchedule defines when rules should be evaluated (cron
+                  expression)
+                type: string
+              emergencyResponse:
+                description: EmergencyResponse defines reactive scaling behavior for
+                  OOM and CPU throttling
+                properties:
+                  cpuThrottlingEnabled:
+                    description: CPUThrottlingEnabled indicates if CPU throttling
+                      response is active
+                    type: boolean
+                  cpuThrottlingMultiplier:
+                    description: CPUThrottlingMultiplier is the multiplier for CPU
+                      increase on throttling
+                    type: string
+                  cpuThrottlingThreshold:
+                    description: CPUThrottlingThreshold is the fraction of time throttled
+                      that triggers response (e.g., "0.10" = 10%)
+                    type: string
+                  oomCooldownSeconds:
+                    description: OOMCooldownSeconds is the cooldown period between
+                      OOM reactions
+                    type: integer
+                  oomEnabled:
+                    description: OOMEnabled indicates if OOM response is active
+                    type: boolean
+                  oomMaxReactions:
+                    description: OOMMaxReactions is the maximum number of OOM reactions
+                      before waiting for control plane
+                    type: integer
+                  oomMemoryMultiplier:
+                    description: OOMMemoryMultiplier is the multiplier for memory
+                      increase on OOM (e.g., "1.5" = 50% increase)
+                    type: string
+                type: object
+              generation:
+                description: Generation is the rule generation number, incremented
+                  on each update
+                format: int64
+                type: integer
+              gpuRule:
+                description: GPU Rule Configuration
+                properties:
+                  baseRequest:
+                    description: BaseRequest is the base resource request value (e.g.,
+                      "500m" for CPU or "1Gi" for memory)
+                    type: string
+                  enabled:
+                    description: Enabled indicates if this resource rule is active
+                    type: boolean
+                  limitMultiplier:
+                    description: LimitMultiplier is the multiplier to calculate limits
+                      from requests (e.g., "1.5")
+                    type: string
+                  limitsAdjustmentEnabled:
+                    description: LimitsAdjustmentEnabled indicates if limits should
+                      be adjusted alongside requests
+                    type: boolean
+                  maxRequest:
+                    description: MaxRequest is the maximum allowed resource request
+                    type: string
+                  maxScaleDownPercent:
+                    description: MaxScaleDownPercent is the maximum percentage decrease
+                      allowed per scaling event (e.g., "0.5" for 50%)
+                    type: string
+                  maxScaleUpPercent:
+                    description: MaxScaleUpPercent is the maximum percentage increase
+                      allowed per scaling event (e.g., "1.0" for 100%)
+                    type: string
+                  minRequest:
+                    description: MinRequest is the minimum allowed resource request
+                    type: string
+                  targetPercentile:
+                    description: TargetPercentile is the target percentile for resource
+                      recommendations (e.g., "0.75" for P75)
+                    type: string
+                required:
+                - enabled
+                type: object
+              hpaRule:
+                description: HPA Rule Configuration
+                properties:
+                  enabled:
+                    description: Enabled indicates if HPA scaling is active
+                    type: boolean
+                  maxReplicaChangePercent:
+                    description: MaxReplicaChangePercent is the maximum percentage
+                      of replicas to add/remove per scaling event
+                    type: string
+                  maxReplicas:
+                    description: MaxReplicas is the maximum number of replicas
+                    format: int32
+                    type: integer
+                  minReplicas:
+                    description: MinReplicas is the minimum number of replicas
+                    format: int32
+                    type: integer
+                  primaryMetric:
+                    description: PrimaryMetric is the primary metric used for HPA
+                      scaling decisions
+                    type: string
+                  targetUtilization:
+                    description: TargetUtilization is the target average utilization
+                      for the primary metric (e.g., "0.70" for 70%)
+                    type: string
+                required:
+                - enabled
+                type: object
+              kind:
+                description: Kind is the Kubernetes object kind (Deployment, StatefulSet,
+                  etc.)
+                type: string
+              memoryRule:
+                description: Memory Rule Configuration
+                properties:
+                  baseRequest:
+                    description: BaseRequest is the base resource request value (e.g.,
+                      "500m" for CPU or "1Gi" for memory)
+                    type: string
+                  enabled:
+                    description: Enabled indicates if this resource rule is active
+                    type: boolean
+                  limitMultiplier:
+                    description: LimitMultiplier is the multiplier to calculate limits
+                      from requests (e.g., "1.5")
+                    type: string
+                  limitsAdjustmentEnabled:
+                    description: LimitsAdjustmentEnabled indicates if limits should
+                      be adjusted alongside requests
+                    type: boolean
+                  maxRequest:
+                    description: MaxRequest is the maximum allowed resource request
+                    type: string
+                  maxScaleDownPercent:
+                    description: MaxScaleDownPercent is the maximum percentage decrease
+                      allowed per scaling event (e.g., "0.5" for 50%)
+                    type: string
+                  maxScaleUpPercent:
+                    description: MaxScaleUpPercent is the maximum percentage increase
+                      allowed per scaling event (e.g., "1.0" for 100%)
+                    type: string
+                  minRequest:
+                    description: MinRequest is the minimum allowed resource request
+                    type: string
+                  targetPercentile:
+                    description: TargetPercentile is the target percentile for resource
+                      recommendations (e.g., "0.75" for P75)
+                    type: string
+                required:
+                - enabled
+                type: object
+              name:
+                description: Name is the name of the target workload
+                type: string
+              namespace:
+                description: |-
+                  Workload Reference
+                  Namespace is the namespace of the target workload
+                type: string
+              outlierDetectionEnabled:
+                description: OutlierDetectionEnabled indicates if outlier detection
+                  is enabled for this workload
+                type: boolean
+              percentiles:
+                description: Pre-computed percentiles per resource axis from control
+                  plane
+                properties:
+                  cpu:
+                    description: PercentileSet contains pre-computed percentile values
+                      for a single resource axis
+                    properties:
+                      p50:
+                        type: string
+                      p80:
+                        type: string
+                      p90:
+                        type: string
+                      p95:
+                        type: string
+                      p99:
+                        type: string
+                    type: object
+                  memory:
+                    description: PercentileSet contains pre-computed percentile values
+                      for a single resource axis
+                    properties:
+                      p50:
+                        type: string
+                      p80:
+                        type: string
+                      p90:
+                        type: string
+                      p95:
+                        type: string
+                      p99:
+                        type: string
+                    type: object
+                type: object
+              policyId:
+                description: PolicyID is the control plane's UUID for the policy that
+                  generated this rule
+                type: string
+              ruleId:
+                description: RuleID is the control plane's UUID for this rule (for
+                  tracking/linking)
+                type: string
+              startupPeriodSeconds:
+                description: StartupPeriodSeconds is the duration to wait before applying
+                  rules after pod startup
+                format: int64
+                type: integer
+              version:
+                description: Version is the MPA v2 engine version that generated this
+                  rule
+                type: string
+            required:
+            - generation
+            - kind
+            - name
+            - namespace
+            - version
+            type: object
+          status:
+            default:
+              phase: Active
+            description: WorkloadRuleStatusInfo tracks rule evaluation status
+            properties:
+              conditions:
+                description: Conditions contains the current conditions of the rule
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              currentCPUMillis:
+                description: CurrentCPUMillis is the current CPU usage in millicores
+                format: int64
+                type: integer
+              currentCPUUtilization:
+                description: CurrentCPUUtilization is the current CPU utilization
+                  (0.0-1.0)
+                type: string
+              currentMemoryBytes:
+                description: CurrentMemoryBytes is the current memory usage in bytes
+                format: int64
+                type: integer
+              currentMemoryUtilization:
+                description: CurrentMemoryUtilization is the current memory utilization
+                  (0.0-1.0)
+                type: string
+              evaluationCount:
+                description: EvaluationCount is the total number of times this rule
+                  has been evaluated
+                format: int64
+                type: integer
+              failureCount:
+                description: FailureCount is the number of failed evaluations
+                format: int64
+                type: integer
+              lastEvaluatedAt:
+                description: LastEvaluatedAt is the timestamp of the last rule evaluation
+                format: date-time
+                type: string
+              lastOOMResponseTime:
+                description: LastOOMResponseTime is the timestamp of the last OOM
+                  response
+                format: date-time
+                type: string
+              lastScaleTime:
+                description: LastScaleTime is the timestamp of the last scaling action
+                format: date-time
+                type: string
+              message:
+                description: Message contains human-readable details about the current
+                  state
+                type: string
+              oomReactionCount:
+                description: OOMReactionCount is the number of OOM reactions performed
+                  by in-cluster evaluator
+                type: integer
+              phase:
+                default: Active
+                description: Phase represents the current phase of the rule
+                enum:
+                - Active
+                - Inactive
+                - Failed
+                type: string
+              successCount:
+                description: SuccessCount is the number of successful evaluations
+                format: int64
+                type: integer
             type: object
         type: object
     served: true
