@@ -101,8 +101,8 @@ jobs:
 
     - name: Renaming operator (from dakr in helm/dakr/Chart.yaml, to dakr-operator) to match upstream repo name
       run: |
-        # on mac: sed -i '' 's/^name: dakr$/name: dakr-operator/' helm/dakr/Chart.yaml
-        sed -i 's/^name: dakr$/name: dakr-operator/' helm/dakr/Chart.yaml
+        # on mac: sed -i '' 's/^name: dakr$/name: dakr/' helm/dakr/Chart.yaml
+        sed -i 's/^name: dakr$/name: dakr/' helm/dakr/Chart.yaml
 
     - name: Update chart dependencies
       run: |
