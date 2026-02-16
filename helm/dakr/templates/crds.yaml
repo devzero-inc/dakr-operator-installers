@@ -827,6 +827,7 @@ spec:
                   enum:
                   - PodCreation
                   - PodUpdate
+                  - PodEviction
                   type: string
                 type: array
               enableInClusterMpa:

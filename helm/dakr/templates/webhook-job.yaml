@@ -305,6 +305,59 @@ spec:
               else
                 echo "WARNING: CA bundle in validating webhook doesn't match the expected value."
               fi 
-              {{- end }} 
+              {{- end }}
+
+              # ------------------------------------------------------------------
+              # Patch Eviction ValidatingWebhookConfiguration
+              # ------------------------------------------------------------------
+              
+              EVICTION_WEBHOOK_NAME="{{ include "dakr.fullname" . }}-eviction"
+              
+              # Wait for Eviction ValidatingWebhookConfiguration
+              echo "Waiting for Eviction ValidatingWebhookConfiguration ${EVICTION_WEBHOOK_NAME} to be available..."
+              for i in $(seq 1 $MAX_RETRY); do
+                if kubectl get validatingwebhookconfiguration "$EVICTION_WEBHOOK_NAME" &>/dev/null; then
+                  echo "Eviction ValidatingWebhookConfiguration found!"
+                  break
+                fi
+                if [ $i -eq $MAX_RETRY ]; then
+                  echo "Timeout waiting for Eviction ValidatingWebhookConfiguration $EVICTION_WEBHOOK_NAME. Skipping."
+                  exit 0
+                fi
+                echo "Eviction webhook not ready yet. Retry $i/$MAX_RETRY. Waiting $RETRY_INTERVAL seconds..."
+                sleep $RETRY_INTERVAL
+              done
+
+              # Save current state of eviction webhook before patching
+              echo "Current state of eviction webhook before patching:"
+              kubectl get validatingwebhookconfiguration "$EVICTION_WEBHOOK_NAME" -o jsonpath="{.webhooks[0].clientConfig.caBundle}" | head -c 20
+              echo "..."
+              
+              # Patch the eviction webhook with the CA bundle
+              echo "Patching Eviction ValidatingWebhookConfiguration with updated CA Bundle..."
+              kubectl patch validatingwebhookconfiguration "$EVICTION_WEBHOOK_NAME" \
+                --type='json' -p="[{\"op\": \"replace\", \"path\": \"/webhooks/0/clientConfig/caBundle\", \"value\":\"$CA_BUNDLE\"}]" || {
+                  echo "Failed to patch eviction webhook. Dumping current state:"
+                  kubectl get validatingwebhookconfiguration "$EVICTION_WEBHOOK_NAME" -o yaml
+                  exit 1
+              }
+
+              # Verify the patch was applied correctly
+              echo "Verifying eviction webhook patch was applied correctly..."
+              sleep 2
+              CURRENT_EVICTION_CA_BUNDLE=$(kubectl get validatingwebhookconfiguration "$EVICTION_WEBHOOK_NAME" -o jsonpath="{.webhooks[0].clientConfig.caBundle}")
+              if [ -z "$CURRENT_EVICTION_CA_BUNDLE" ]; then
+                echo "ERROR: After patching, caBundle is still empty in eviction webhook configuration"
+                kubectl get validatingwebhookconfiguration "$EVICTION_WEBHOOK_NAME" -o yaml
+                exit 1
+              fi
+              
+              echo "Verification: CA bundle length in eviction webhook: $(echo -n "$CURRENT_EVICTION_CA_BUNDLE" | wc -c) characters"
+              
+              if [ "$CA_BUNDLE" = "$CURRENT_EVICTION_CA_BUNDLE" ]; then
+                echo "SUCCESS: Eviction Webhook successfully patched with new CA certificate."
+              else
+                echo "WARNING: CA bundle in eviction webhook doesn't match the expected value."
+              fi 
 ---
 {{- end }}
