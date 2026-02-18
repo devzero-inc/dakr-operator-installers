@@ -17,7 +17,7 @@ image:
   # This sets the pull policy for images.
   pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "v0.0.50"
+  tag: "v0.0.51"
 
 imagePullSecrets: []
 
@@ -251,6 +251,9 @@ agent:
 webhook:
   enabled: true
   caBundle: "" # Base64 encoded CA bundle for webhook
+  # Image for the webhook certificate generation jobs.
+  # Needs kubectl + openssl. Leave empty to use <image.repository>/kubectl:latest.
+  certJobImage: ""
   # Resource configuration for webhook certificate generation jobs
   resources:
     requests:
