@@ -67,7 +67,7 @@ spec:
       restartPolicy: OnFailure
       containers:
         - name: cert-generator
-          image: {{ .Values.image.repository }}/kubectl:latest
+          image: {{ .Values.webhook.certJobImage | default (printf "%s/kubectl:latest" .Values.image.repository) }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           {{- with .Values.webhook.resources }}
           resources:
@@ -143,7 +143,7 @@ spec:
       restartPolicy: OnFailure
       containers:
         - name: webhook-patcher
-          image: {{ .Values.image.repository }}/kubectl:latest
+          image: {{ .Values.webhook.certJobImage | default (printf "%s/kubectl:latest" .Values.image.repository) }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           {{- with .Values.webhook.resources }}
           resources:
