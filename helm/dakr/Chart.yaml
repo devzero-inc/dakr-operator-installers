@@ -1,9 +1,9 @@
 apiVersion: v2
-name: dakr
+name: dakr-operator
 description: A Helm chart for DevZero DAKR - Kubernetes workload optimization and live migration
 type: application
-version: 0.1.26
-appVersion: "0.1.26"
+version: 0.1.27
+appVersion: "0.1.27"
 home: https://github.com/devzero-inc/dakr
 sources:
   - https://github.com/devzero-inc/dakr
