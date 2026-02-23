@@ -406,6 +406,7 @@ spec:
                 - Pending
                 - Applying
                 - Applied
+                - AppliedWithRestartFallback
                 - Failed
                 - Skipped
                 - Migrating
@@ -586,6 +587,7 @@ spec:
                 - Pending
                 - Applying
                 - Applied
+                - AppliedWithRestartFallback
                 - Failed
                 - Skipped
                 - Migrating
@@ -652,6 +654,13 @@ spec:
                 type: integer
               namespace:
                 type: string
+              operationType:
+                description: PVCOperationType represents whether a PVC recommendation
+                  is an expand or shrink operation
+                enum:
+                - Expand
+                - Shrink
+                type: string
               policyRef:
                 type: string
               pvcName:
@@ -668,11 +677,6 @@ spec:
                 - Immediate
                 - Soon
                 - Low
-                type: string
-              operationType:
-                enum:
-                - Expand
-                - Shrink
                 type: string
               workloadKind:
                 type: string
@@ -692,11 +696,73 @@ spec:
               appliedAt:
                 format: date-time
                 type: string
+              isVCT:
+                description: VCT migration tracking
+                type: boolean
               message:
                 type: string
               observedGeneration:
                 format: int64
                 type: integer
+              originalPvcLabels:
+                additionalProperties:
+                  type: string
+                type: object
+              originalPvcOwnerRefs:
+                items:
+                  description: |-
+                    OwnerReference contains enough information to let you identify an owning
+                    object. An owning object must be in the same namespace as the dependent, or
+                    be cluster-scoped, so there is no namespace field.
+                  properties:
+                    apiVersion:
+                      description: API version of the referent.
+                      type: string
+                    blockOwnerDeletion:
+                      description: |-
+                        If true, AND if the owner has the "foregroundDeletion" finalizer, then
+                        the owner cannot be deleted from the key-value store until this
+                        reference is removed.
+                        See https://kubernetes.io/docs/concepts/architecture/garbage-collection/#foreground-deletion
+                        for how the garbage collector interacts with this field and enforces the foreground deletion.
+                        Defaults to false.
+                        To set this field, a user needs "delete" permission of the owner,
+                        otherwise 422 (Unprocessable Entity) will be returned.
+                      type: boolean
+                    controller:
+                      description: If true, this reference points to the managing
+                        controller.
+                      type: boolean
+                    kind:
+                      description: |-
+                        Kind of the referent.
+                        More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                      type: string
+                    name:
+                      description: |-
+                        Name of the referent.
+                        More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names#names
+                      type: string
+                    uid:
+                      description: |-
+                        UID of the referent.
+                        More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names#uids
+                      type: string
+                  required:
+                  - apiVersion
+                  - kind
+                  - name
+                  - uid
+                  type: object
+                  x-kubernetes-map-type: atomic
+                type: array
+              originalReplicas:
+                format: int32
+                type: integer
+              originalWhenScaled:
+                type: string
+              patchedWhenScaled:
+                type: boolean
               phase:
                 description: RecommendationPhase represents the current phase of a
                   recommendation
@@ -709,62 +775,12 @@ spec:
                 - Migrating
                 type: string
               shrinkPhase:
-                description: ShrinkMigrationPhase tracks the current step of a PVC shrink migration
-                enum:
-                - ""
-                - SaveVCTMetadata
-                - ScalingDown
-                - WaitScaleDown
-                - CreatingTempPVC
-                - RsyncToTemp
-                - WaitRsyncToTemp
-                - DeletingOldPVC
-                - WaitOldPVCGone
-                - RetainTempPV
-                - DeleteTempPVC
-                - ClearPVClaimRef
-                - CreatingNewPVC
-                - WaitNewPVCBound
-                - ScalingUp
-                - RestoreRetention
-                - Done
-                type: string
-              tempPvcName:
+                description: Shrink migration tracking
                 type: string
               tempPvName:
                 type: string
-              originalReplicas:
-                format: int32
-                type: integer
-              isVCT:
-                type: boolean
-              patchedWhenScaled:
-                type: boolean
-              originalWhenScaled:
+              tempPvcName:
                 type: string
-              originalPvcOwnerRefs:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    apiVersion:
-                      type: string
-                    kind:
-                      type: string
-                    name:
-                      type: string
-                    uid:
-                      type: string
-                    controller:
-                      type: boolean
-                      nullable: true
-                    blockOwnerDeletion:
-                      type: boolean
-                      nullable: true
-              originalPvcLabels:
-                type: object
-                additionalProperties:
-                  type: string
             type: object
         type: object
     served: true
@@ -1221,6 +1237,11 @@ spec:
                   - type
                   type: object
                 type: array
+              liveMigrationDegraded:
+                description: |-
+                  LiveMigrationDegraded indicates that live migration was requested but restore failed,
+                  causing a fallback to a cold container start. The recommendation resources ARE applied.
+                type: boolean
               message:
                 description: Message contains human-readable details about the current
                   state
@@ -1237,6 +1258,7 @@ spec:
                 - Pending
                 - Applying
                 - Applied
+                - AppliedWithRestartFallback
                 - Failed
                 - Skipped
                 - Migrating
@@ -1329,6 +1351,10 @@ spec:
                         type: string
                       network:
                         type: string
+                      pmaxCpu:
+                        type: string
+                      pmaxMem:
+                        type: string
                     type: object
                   dominantResource:
                     description: DominantResource is the resource axis this workload
@@ -1377,6 +1403,18 @@ spec:
                     type: string
                   minRequest:
                     description: MinRequest is the minimum allowed resource request
+                    type: string
+                  pmaxProtectionActive:
+                    description: PmaxProtectionActive indicates whether pmax spike
+                      protection raised the request
+                    type: boolean
+                  pmaxRatio:
+                    description: PmaxRatio is the ratio of pmax to baseRequest before
+                      spike protection (e.g., "5.20")
+                    type: string
+                  pmaxValue:
+                    description: PmaxValue is the observed maximum resource value
+                      (millicores for CPU, bytes for memory)
                     type: string
                   targetPercentile:
                     description: TargetPercentile is the target percentile for resource
@@ -1458,6 +1496,18 @@ spec:
                   minRequest:
                     description: MinRequest is the minimum allowed resource request
                     type: string
+                  pmaxProtectionActive:
+                    description: PmaxProtectionActive indicates whether pmax spike
+                      protection raised the request
+                    type: boolean
+                  pmaxRatio:
+                    description: PmaxRatio is the ratio of pmax to baseRequest before
+                      spike protection (e.g., "5.20")
+                    type: string
+                  pmaxValue:
+                    description: PmaxValue is the observed maximum resource value
+                      (millicores for CPU, bytes for memory)
+                    type: string
                   targetPercentile:
                     description: TargetPercentile is the target percentile for resource
                       recommendations (e.g., "0.75" for P75)
@@ -1487,6 +1537,11 @@ spec:
                     description: PrimaryMetric is the primary metric used for HPA
                       scaling decisions
                     type: string
+                  scaleDownCooldownSeconds:
+                    description: ScaleDownCooldownSeconds is the cooldown period after
+                      a scale-down event (default 600 = 10 minutes)
+                    format: int32
+                    type: integer
                   targetUtilization:
                     description: TargetUtilization is the target average utilization
                       for the primary metric (e.g., "0.70" for 70%)
@@ -1529,6 +1584,18 @@ spec:
                     type: string
                   minRequest:
                     description: MinRequest is the minimum allowed resource request
+                    type: string
+                  pmaxProtectionActive:
+                    description: PmaxProtectionActive indicates whether pmax spike
+                      protection raised the request
+                    type: boolean
+                  pmaxRatio:
+                    description: PmaxRatio is the ratio of pmax to baseRequest before
+                      spike protection (e.g., "5.20")
+                    type: string
+                  pmaxValue:
+                    description: PmaxValue is the observed maximum resource value
+                      (millicores for CPU, bytes for memory)
                     type: string
                   targetPercentile:
                     description: TargetPercentile is the target percentile for resource
@@ -1670,6 +1737,70 @@ spec:
                   - type
                   type: object
                 type: array
+              cpuThrottleEvents:
+                description: |-
+                  CPUThrottleEvents is a structured log of recent CPU throttle events and emergency responses.
+                  Bounded to the last MaxCPUThrottleEvents entries. Oldest events are trimmed on append.
+                items:
+                  description: CPUThrottleEvent records a single CPU throttle event
+                    and the operator's emergency response.
+                  properties:
+                    containerName:
+                      description: ContainerName is the container that was throttled
+                      type: string
+                    cpuLimitAtMillis:
+                      description: CPULimitAtMillis is the CPU limit (millicores)
+                        when the throttle occurred
+                      format: int64
+                      type: integer
+                    cpuRequestAtMillis:
+                      description: CPURequestAtMillis is the CPU request (millicores)
+                        when the throttle occurred
+                      format: int64
+                      type: integer
+                    cpuUsageAtMillis:
+                      description: CPUUsageAtMillis is the CPU usage (millicores)
+                        at time of throttle detection
+                      format: int64
+                      type: integer
+                    emergencyReaction:
+                      description: EmergencyReaction indicates whether the operator
+                        auto-bumped CPU in response
+                      type: boolean
+                    newCPUAfterMillis:
+                      description: NewCPUAfterMillis is the CPU request the operator
+                        bumped to (if EmergencyReaction is true)
+                      format: int64
+                      type: integer
+                    ruleGeneration:
+                      description: RuleGeneration is the WorkloadRule spec.generation
+                        that was active
+                      format: int64
+                      type: integer
+                    throttledFraction:
+                      description: |-
+                        ThrottledFraction is the fraction of time the container was throttled (0.0-1.0).
+                        When detected via heuristic (usage >= 95% of limit), this is "0.95".
+                      type: string
+                    timestamp:
+                      description: Timestamp is when the CPU throttle was detected
+                      format: date-time
+                      type: string
+                  required:
+                  - containerName
+                  - cpuLimitAtMillis
+                  - cpuRequestAtMillis
+                  - cpuUsageAtMillis
+                  - emergencyReaction
+                  - ruleGeneration
+                  - throttledFraction
+                  - timestamp
+                  type: object
+                type: array
+              cpuThrottleReactionCount:
+                description: CPUThrottleReactionCount is the number of CPU throttle
+                  reactions performed by in-cluster evaluator
+                type: integer
               currentCPUMillis:
                 description: CurrentCPUMillis is the current CPU usage in millicores
                 format: int64
@@ -1695,6 +1826,17 @@ spec:
                 description: FailureCount is the number of failed evaluations
                 format: int64
                 type: integer
+              lastCPUEmergencyMillis:
+                description: |-
+                  LastCPUEmergencyMillis is the highest CPU value set by emergency response (throttle reaction).
+                  The evaluator should not recommend below this value.
+                format: int64
+                type: integer
+              lastCPUEmergencyTime:
+                description: LastCPUEmergencyTime is when the last CPU emergency response
+                  occurred.
+                format: date-time
+                type: string
               lastEvaluatedAt:
                 description: LastEvaluatedAt is the timestamp of the last rule evaluation
                 format: date-time
@@ -1712,6 +1854,65 @@ spec:
                 description: Message contains human-readable details about the current
                   state
                 type: string
+              oomEvents:
+                description: |-
+                  OOMEvents is a structured log of recent OOM kill events and emergency responses.
+                  Bounded to the last MaxOOMEvents entries. Oldest events are trimmed on append.
+                items:
+                  description: OOMEvent records a single OOM kill event and the operator's
+                    emergency response.
+                  properties:
+                    containerName:
+                      description: ContainerName is the container that was OOM killed
+                      type: string
+                    emergencyReaction:
+                      description: EmergencyReaction indicates whether the operator
+                        auto-bumped memory in response
+                      type: boolean
+                    memoryLimitAtBytes:
+                      description: MemoryLimitAtBytes is the memory limit when the
+                        OOM occurred
+                      format: int64
+                      type: integer
+                    memoryRequestAtBytes:
+                      description: MemoryRequestAtBytes is the memory request when
+                        the OOM occurred
+                      format: int64
+                      type: integer
+                    memoryUsageAtBytes:
+                      description: MemoryUsageAtBytes is the memory usage at time
+                        of kill
+                      format: int64
+                      type: integer
+                    newMemoryAfterBytes:
+                      description: NewMemoryAfterBytes is the memory request the operator
+                        bumped to (if EmergencyReaction is true)
+                      format: int64
+                      type: integer
+                    restartCount:
+                      description: RestartCount is the container's restart count at
+                        the time of the OOM event
+                      type: integer
+                    ruleGeneration:
+                      description: RuleGeneration is the WorkloadRule spec.generation
+                        that was active when the OOM occurred
+                      format: int64
+                      type: integer
+                    timestamp:
+                      description: Timestamp is when the OOM kill was detected
+                      format: date-time
+                      type: string
+                  required:
+                  - containerName
+                  - emergencyReaction
+                  - memoryLimitAtBytes
+                  - memoryRequestAtBytes
+                  - memoryUsageAtBytes
+                  - restartCount
+                  - ruleGeneration
+                  - timestamp
+                  type: object
+                type: array
               oomReactionCount:
                 description: OOMReactionCount is the number of OOM reactions performed
                   by in-cluster evaluator
