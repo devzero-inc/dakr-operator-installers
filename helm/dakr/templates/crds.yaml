@@ -770,6 +770,7 @@ spec:
                 - Pending
                 - Applying
                 - Applied
+                - AppliedWithRestartFallback
                 - Failed
                 - Skipped
                 - Migrating
