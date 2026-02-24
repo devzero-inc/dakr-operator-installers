@@ -234,6 +234,15 @@ Resources:
               "Action": "pricing:GetProducts"
             },
             {
+              "Sid": "AllowSavingsPlansReadActions",
+              "Effect": "Allow",
+              "Resource": "*",
+              "Action": [
+                "savingsplans:DescribeSavingsPlans",
+                "savingsplans:DescribeSavingsPlanRates"
+              ]
+            },
+            {
               "Sid": "AllowInterruptionQueueActions",
               "Effect": "Allow",
               "Resource": "${KarpenterInterruptionQueue.Arn}",
