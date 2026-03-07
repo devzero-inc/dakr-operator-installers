@@ -220,6 +220,15 @@ rules:
   resources: ["jobs/status"]
   verbs: ["get", "update", "patch", "delete", "create"]
 {{- end }}
+{{- if .Capabilities.APIVersions.Has "postgresql.cnpg.io/v1/Cluster" }}
+# CloudNativePG resources
+- apiGroups: ["postgresql.cnpg.io"]
+  resources: ["clusters"]
+  verbs: ["get", "list", "watch", "update", "patch"]
+- apiGroups: ["postgresql.cnpg.io"]
+  resources: ["clusters/status"]
+  verbs: ["get", "update", "patch"]
+{{- end }}
 {{- if .Capabilities.APIVersions.Has "sparkoperator.k8s.io/v1beta2/SparkApplication" }}
 # Spark Operator resources
 - apiGroups: ["sparkoperator.k8s.io"]

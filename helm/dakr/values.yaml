@@ -17,7 +17,7 @@ image:
   # This sets the pull policy for images.
   pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "v0.0.54"
+  tag: "v0.0.55"
 
 imagePullSecrets: []
 
@@ -82,8 +82,8 @@ operator:
   janitor:
     # Cleanup interval in minutes (default: 30)
     cleanupIntervalMinutes: 30
-    # Retention period in days for completed/failed/skipped WorkloadRecommendation CRs (default: 7)
-    retentionDays: 7
+    # Retention period in days for completed/failed/skipped WorkloadRecommendation CRs (default: 1)
+    retentionDays: 1
   serviceAccount:
     name: "dakr-operator-sa"
     # Annotations for cloud provider IAM integration.

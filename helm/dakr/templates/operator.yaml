@@ -114,7 +114,7 @@ spec:
           - name: JANITOR_CLEANUP_INTERVAL_MINUTES
             value: {{ .Values.operator.janitor.cleanupIntervalMinutes | default 30 | quote }}
           - name: JANITOR_RETENTION_DAYS
-            value: {{ .Values.operator.janitor.retentionDays | default 7 | quote }}
+            value: {{ .Values.operator.janitor.retentionDays | default 1 | quote }}
           - name: ENABLE_MPA_CONTROLLER
             value: {{ .Values.mpaController.enabled | quote }}
         image: "{{ .Values.image.repository }}/{{ .Values.operator.image }}:{{ .Values.image.tag }}"
