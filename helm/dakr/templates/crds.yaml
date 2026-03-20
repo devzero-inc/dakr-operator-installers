@@ -410,6 +410,7 @@ spec:
                 - Failed
                 - Skipped
                 - Migrating
+                - InPlaceScaling
                 type: string
             type: object
         type: object
@@ -591,6 +592,7 @@ spec:
                 - Failed
                 - Skipped
                 - Migrating
+                - InPlaceScaling
                 type: string
             type: object
         type: object
@@ -774,6 +776,7 @@ spec:
                 - Failed
                 - Skipped
                 - Migrating
+                - InPlaceScaling
                 type: string
               shrinkPhase:
                 description: Shrink migration tracking
@@ -819,6 +822,9 @@ spec:
       type: string
     - jsonPath: .spec.useLiveMigration
       name: LiveMigration
+      type: string
+    - jsonPath: .spec.useInPlaceVerticalScaling
+      name: InPlace
       type: string
     - jsonPath: .spec.schedulerName
       name: Scheduler
@@ -887,6 +893,10 @@ spec:
                     cpuLimitsAdjustmentEnabled:
                       description: CpuLimitsAdjustmentEnabled indicates if the policy
                         allows CPU limits to be adjusted
+                      type: boolean
+                    cpuLimitsRemovalEnabled:
+                      description: CpuLimitsRemovalEnabled indicates if the policy
+                        allows CPU limits to be actively removed
                       type: boolean
                     currentLimit:
                       properties:
@@ -1157,6 +1167,13 @@ spec:
                   the primary metric (percentage)
                 format: int32
                 type: integer
+              useInPlaceVerticalScaling:
+                description: |-
+                  UseInPlaceVerticalScaling determines if this recommendation should be applied
+                  via in-place pod vertical scaling (k8s >= 1.33) instead of triggering pod restarts.
+                  When true, pods are resized first via the /resize subresource, then the workload
+                  spec is updated with pause/resume to prevent rolling restarts.
+                type: boolean
               useLiveMigration:
                 description: UseLiveMigration determines if this recommendation should
                   be applied through live migration
@@ -1263,6 +1280,7 @@ spec:
                 - Failed
                 - Skipped
                 - Migrating
+                - InPlaceScaling
                 type: string
             type: object
         type: object
@@ -1391,6 +1409,11 @@ spec:
                     description: LimitsAdjustmentEnabled indicates if limits should
                       be adjusted alongside requests
                     type: boolean
+                  limitsRemovalEnabled:
+                    description: |-
+                      LimitsRemovalEnabled indicates if limits should be actively removed from workloads
+                      Takes precedence over LimitsAdjustmentEnabled when true
+                    type: boolean
                   maxRequest:
                     description: MaxRequest is the maximum allowed resource request
                     type: string
@@ -1483,6 +1506,11 @@ spec:
                     description: LimitsAdjustmentEnabled indicates if limits should
                       be adjusted alongside requests
                     type: boolean
+                  limitsRemovalEnabled:
+                    description: |-
+                      LimitsRemovalEnabled indicates if limits should be actively removed from workloads
+                      Takes precedence over LimitsAdjustmentEnabled when true
+                    type: boolean
                   maxRequest:
                     description: MaxRequest is the maximum allowed resource request
                     type: string
@@ -1571,6 +1599,11 @@ spec:
                   limitsAdjustmentEnabled:
                     description: LimitsAdjustmentEnabled indicates if limits should
                       be adjusted alongside requests
+                    type: boolean
+                  limitsRemovalEnabled:
+                    description: |-
+                      LimitsRemovalEnabled indicates if limits should be actively removed from workloads
+                      Takes precedence over LimitsAdjustmentEnabled when true
                     type: boolean
                   maxRequest:
                     description: MaxRequest is the maximum allowed resource request
@@ -1665,6 +1698,11 @@ spec:
                   rules after pod startup
                 format: int64
                 type: integer
+              useInPlaceVerticalScaling:
+                description: |-
+                  UseInPlaceVerticalScaling indicates the rule evaluator should create recommendations
+                  that use in-place pod vertical scaling instead of triggering pod restarts (k8s >= 1.33).
+                type: boolean
               version:
                 description: Version is the MPA v2 engine version that generated this
                   rule

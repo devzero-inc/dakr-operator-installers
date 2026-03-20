@@ -43,6 +43,10 @@ rules:
 - apiGroups: [""]
   resources: ["pods/status"]
   verbs: ["update"]
+# In-place pod vertical scaling (k8s >= v1.33)
+- apiGroups: [""]
+  resources: ["pods/resize"]
+  verbs: ["get", "patch"]
 # Node access - configurable based on security settings
 - apiGroups: [""]
   resources: ["nodes"]

@@ -17,7 +17,7 @@ image:
   # This sets the pull policy for images.
   pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "v0.0.56"
+  tag: "v0.0.57"
 
 imagePullSecrets: []
 
@@ -78,6 +78,7 @@ operator:
     argocdPatching: false # if set, the operator will patch argo applications to ignore differences from the dakr operator
     workloadRecBatchSize: 1 # needs to be >=1; determines batch size of pulling down workload recommendations from control plane, before being persisted as CRDs
     nodeGroupRecBatchSize: 1 # needs to be >=1; determines batch size of pulling down node group recommendations from control plane, before being persisted as CRDs
+    forceInPlaceForAll: true # if set, in-place vertical scaling resizes pods directly for ALL workload kinds, even unsupported ones. Pods will diverge from workload spec until next restart.
   # Janitor configuration for periodic cleanup of old CRDs
   janitor:
     # Cleanup interval in minutes (default: 30)
