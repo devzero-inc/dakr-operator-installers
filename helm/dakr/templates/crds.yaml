@@ -407,6 +407,7 @@ spec:
                 - Applying
                 - Applied
                 - AppliedWithRestartFallback
+                - PartialFailure
                 - Failed
                 - Skipped
                 - Migrating
@@ -589,6 +590,7 @@ spec:
                 - Applying
                 - Applied
                 - AppliedWithRestartFallback
+                - PartialFailure
                 - Failed
                 - Skipped
                 - Migrating
@@ -773,6 +775,7 @@ spec:
                 - Applying
                 - Applied
                 - AppliedWithRestartFallback
+                - PartialFailure
                 - Failed
                 - Skipped
                 - Migrating
@@ -1277,11 +1280,71 @@ spec:
                 - Applying
                 - Applied
                 - AppliedWithRestartFallback
+                - PartialFailure
                 - Failed
                 - Skipped
                 - Migrating
                 - InPlaceScaling
                 type: string
+              rollingCheckpoint:
+                description: |-
+                  RollingCheckpoint tracks per-pod checkpoint/restore progress during rolling updates.
+                  Only populated when the workload uses rolling checkpoint (Deployment, StatefulSet, DaemonSet).
+                properties:
+                  originalStrategy:
+                    description: |-
+                      OriginalStrategy is the workload's update strategy before we changed it
+                      (e.g. "RollingUpdate"). Empty for Deployments (which use pause/unpause).
+                    type: string
+                  podNames:
+                    description: PodNames is the ordered list of pod names to process.
+                    items:
+                      type: string
+                    type: array
+                  podResults:
+                    description: PodResults contains the checkpoint/restore result
+                      for each pod.
+                    items:
+                      description: PodCheckpointResult holds the checkpoint/restore
+                        status and message for a single pod.
+                      properties:
+                        message:
+                          description: Message contains human-readable details about
+                            the outcome.
+                          type: string
+                        phase:
+                          description: 'Phase indicates the outcome: Pending, Completed,
+                            or Failed.'
+                          enum:
+                          - Pending
+                          - Completed
+                          - Failed
+                          type: string
+                        podName:
+                          description: PodName is the name of the pod that was checkpointed.
+                          type: string
+                      required:
+                      - phase
+                      - podName
+                      type: object
+                    type: array
+                    x-kubernetes-list-map-keys:
+                    - podName
+                    x-kubernetes-list-type: map
+                  processedPods:
+                    description: |-
+                      ProcessedPods is the number of pods that have been dispatched for
+                      checkpoint+delete. Used to detect in-flight pods (ProcessedPods > len(PodResults)).
+                    type: integer
+                  totalPods:
+                    description: TotalPods is the number of pods that need to be checkpointed
+                      and replaced.
+                    type: integer
+                required:
+                - podNames
+                - processedPods
+                - totalPods
+                type: object
             type: object
         type: object
     served: true
@@ -1391,6 +1454,128 @@ spec:
                 description: ConfidenceScore indicates the confidence level of this
                   rule (0.0-1.0)
                 type: string
+              containers:
+                description: |-
+                  Containers holds per-container resource configurations (VPA).
+                  When empty, workload-level rules apply to all containers.
+                items:
+                  description: CRDContainerConfig holds per-container resource rule
+                    configurations.
+                  properties:
+                    containerName:
+                      description: ContainerName is the name of the container
+                      type: string
+                    cpuRule:
+                      description: CPURule is the CPU resource config for this container
+                      properties:
+                        baseRequest:
+                          description: BaseRequest is the base resource request value
+                            (e.g., "500m" for CPU or "128Mi" for memory)
+                          type: string
+                        enabled:
+                          description: Enabled indicates if this resource rule is
+                            active for the container
+                          type: boolean
+                        limitMultiplier:
+                          description: LimitMultiplier is the multiplier to calculate
+                            limits from requests (e.g., "1.5")
+                          type: string
+                        limitsAdjustmentEnabled:
+                          description: LimitsAdjustmentEnabled indicates if limits
+                            should be adjusted alongside requests
+                          type: boolean
+                        limitsRemovalEnabled:
+                          description: LimitsRemovalEnabled indicates if limits should
+                            be actively removed
+                          type: boolean
+                        maxRequest:
+                          description: MaxRequest is the maximum allowed resource
+                            request
+                          type: string
+                        minRequest:
+                          description: MinRequest is the minimum allowed resource
+                            request
+                          type: string
+                      required:
+                      - enabled
+                      type: object
+                    gpuRule:
+                      description: GPURule is the GPU resource config for this container
+                      properties:
+                        baseRequest:
+                          description: BaseRequest is the base resource request value
+                            (e.g., "500m" for CPU or "128Mi" for memory)
+                          type: string
+                        enabled:
+                          description: Enabled indicates if this resource rule is
+                            active for the container
+                          type: boolean
+                        limitMultiplier:
+                          description: LimitMultiplier is the multiplier to calculate
+                            limits from requests (e.g., "1.5")
+                          type: string
+                        limitsAdjustmentEnabled:
+                          description: LimitsAdjustmentEnabled indicates if limits
+                            should be adjusted alongside requests
+                          type: boolean
+                        limitsRemovalEnabled:
+                          description: LimitsRemovalEnabled indicates if limits should
+                            be actively removed
+                          type: boolean
+                        maxRequest:
+                          description: MaxRequest is the maximum allowed resource
+                            request
+                          type: string
+                        minRequest:
+                          description: MinRequest is the minimum allowed resource
+                            request
+                          type: string
+                      required:
+                      - enabled
+                      type: object
+                    memoryRule:
+                      description: MemoryRule is the memory resource config for this
+                        container
+                      properties:
+                        baseRequest:
+                          description: BaseRequest is the base resource request value
+                            (e.g., "500m" for CPU or "128Mi" for memory)
+                          type: string
+                        enabled:
+                          description: Enabled indicates if this resource rule is
+                            active for the container
+                          type: boolean
+                        limitMultiplier:
+                          description: LimitMultiplier is the multiplier to calculate
+                            limits from requests (e.g., "1.5")
+                          type: string
+                        limitsAdjustmentEnabled:
+                          description: LimitsAdjustmentEnabled indicates if limits
+                            should be adjusted alongside requests
+                          type: boolean
+                        limitsRemovalEnabled:
+                          description: LimitsRemovalEnabled indicates if limits should
+                            be actively removed
+                          type: boolean
+                        maxRequest:
+                          description: MaxRequest is the maximum allowed resource
+                            request
+                          type: string
+                        minRequest:
+                          description: MinRequest is the minimum allowed resource
+                            request
+                          type: string
+                      required:
+                      - enabled
+                      type: object
+                  required:
+                  - containerName
+                  type: object
+                type: array
+              cooldownMinutes:
+                description: CooldownMinutes is the wait time between applying recommendations
+                format: int32
+                type: integer
               cpuRule:
                 description: CPU Rule Configuration
                 properties:
@@ -1451,6 +1636,21 @@ spec:
                 description: CronSchedule defines when rules should be evaluated (cron
                   expression)
                 type: string
+              defragmentationSchedule:
+                description: DefragmentationSchedule is a cron expression for dz-scheduler
+                  defragmentation
+                type: string
+              detectionTriggers:
+                description: DetectionTriggers contains detection events that trigger
+                  rule evaluation
+                items:
+                  description: DetectionTrigger represents a trigger for a detection
+                  enum:
+                  - PodCreation
+                  - PodUpdate
+                  - PodEviction
+                  type: string
+                type: array
               emergencyResponse:
                 description: EmergencyResponse defines reactive scaling behavior for
                   OOM and CPU throttling
@@ -1547,9 +1747,138 @@ spec:
               hpaRule:
                 description: HPA Rule Configuration
                 properties:
+                  behavior:
+                    description: |-
+                      Behavior configures scale-up and scale-down rate limiting and stabilization windows.
+                      Mirrors Kubernetes HPA v2 Behavior spec semantics.
+                    properties:
+                      scaleDown:
+                        description: ScaleDown configures scale-down behavior.
+                        properties:
+                          policies:
+                            description: Policies is a list of rate-limiting policies
+                              for this direction.
+                            items:
+                              description: HPAScalingPolicy defines a single rate-limiting
+                                rule for scaling.
+                              properties:
+                                periodSeconds:
+                                  description: PeriodSeconds is the time window for
+                                    this policy.
+                                  format: int32
+                                  type: integer
+                                type:
+                                  description: Type is "Pods" (absolute count) or
+                                    "Percent" (percentage of current replicas).
+                                  type: string
+                                value:
+                                  description: Value is the maximum change allowed
+                                    by this policy per period.
+                                  format: int32
+                                  type: integer
+                              required:
+                              - periodSeconds
+                              - type
+                              - value
+                              type: object
+                            type: array
+                          selectPolicy:
+                            description: |-
+                              SelectPolicy determines how to choose among multiple policies.
+                              "Max" picks the most permissive (default for scale-up).
+                              "Min" picks the most restrictive (default for scale-down).
+                              "Disabled" prevents scaling in this direction.
+                            type: string
+                          stabilizationWindowSeconds:
+                            description: |-
+                              StabilizationWindowSeconds is the number of seconds to look back when
+                              selecting the recommended replica count. For scale-up, the highest
+                              recommendation in the window is chosen; for scale-down, the lowest.
+                              Default: 0 for scale-up, 300 for scale-down.
+                            format: int32
+                            type: integer
+                        type: object
+                      scaleUp:
+                        description: ScaleUp configures scale-up behavior.
+                        properties:
+                          policies:
+                            description: Policies is a list of rate-limiting policies
+                              for this direction.
+                            items:
+                              description: HPAScalingPolicy defines a single rate-limiting
+                                rule for scaling.
+                              properties:
+                                periodSeconds:
+                                  description: PeriodSeconds is the time window for
+                                    this policy.
+                                  format: int32
+                                  type: integer
+                                type:
+                                  description: Type is "Pods" (absolute count) or
+                                    "Percent" (percentage of current replicas).
+                                  type: string
+                                value:
+                                  description: Value is the maximum change allowed
+                                    by this policy per period.
+                                  format: int32
+                                  type: integer
+                              required:
+                              - periodSeconds
+                              - type
+                              - value
+                              type: object
+                            type: array
+                          selectPolicy:
+                            description: |-
+                              SelectPolicy determines how to choose among multiple policies.
+                              "Max" picks the most permissive (default for scale-up).
+                              "Min" picks the most restrictive (default for scale-down).
+                              "Disabled" prevents scaling in this direction.
+                            type: string
+                          stabilizationWindowSeconds:
+                            description: |-
+                              StabilizationWindowSeconds is the number of seconds to look back when
+                              selecting the recommended replica count. For scale-up, the highest
+                              recommendation in the window is chosen; for scale-down, the lowest.
+                              Default: 0 for scale-up, 300 for scale-down.
+                            format: int32
+                            type: integer
+                        type: object
+                    type: object
+                  compositeFormula:
+                    description: |-
+                      CompositeFormula is an expression (github.com/expr-lang/expr syntax) that combines
+                      multiple metric values into a single composite score for replica calculation.
+                      Variables: "cpu", "memory", "network" (current utilization/value per metric).
+                      Example: "cpu * 0.5 + memory * 0.3 + network * 0.2"
+                      When set, overrides the default MAX-of-all-metrics strategy.
+                    type: string
                   enabled:
                     description: Enabled indicates if HPA scaling is active
                     type: boolean
+                  fallback:
+                    description: Fallback defines behavior when metric sources become
+                      unavailable.
+                    properties:
+                      behavior:
+                        description: |-
+                          Behavior determines how the fallback replicas value is applied.
+                          One of: "static", "currentReplicas", "currentReplicasIfHigher", "currentReplicasIfLower".
+                        type: string
+                      failureThreshold:
+                        description: FailureThreshold is the number of consecutive
+                          metric failures before fallback activates.
+                        format: int32
+                        type: integer
+                      replicas:
+                        description: Replicas is the replica count to use during fallback.
+                        format: int32
+                        type: integer
+                    required:
+                    - behavior
+                    - failureThreshold
+                    - replicas
+                    type: object
                   maxReplicaChangePercent:
                     description: MaxReplicaChangePercent is the maximum percentage
                       of replicas to add/remove per scaling event
@@ -1558,13 +1887,46 @@ spec:
                     description: MaxReplicas is the maximum number of replicas
                     format: int32
                     type: integer
+                  metrics:
+                    description: |-
+                      Metrics defines multi-metric triggers for HPA scaling decisions.
+                      When populated, replaces the legacy single PrimaryMetric + TargetUtilization path.
+                      The HPA engine evaluates all metrics in parallel and takes the MAX desired replicas.
+                    items:
+                      description: HPAMetricTrigger defines a single metric source
+                        and its scaling target for multi-metric HPA.
+                      properties:
+                        targetUtilization:
+                          description: |-
+                            TargetUtilization is the target average utilization as a fraction (0.0-1.0).
+                            Used for resource metrics (CPU, Memory).
+                          type: string
+                        targetValue:
+                          description: |-
+                            TargetValue is the target absolute value (e.g., bytes/sec for network metrics).
+                            Used for absolute metrics (NetworkIngress, NetworkEgress).
+                          type: string
+                        type:
+                          description: Type is the metric type (CPU, Memory, NetworkIngress,
+                            NetworkEgress)
+                          type: string
+                        weight:
+                          description: |-
+                            Weight is the weight of this metric in a composite formula (0.0-1.0).
+                            Only used when HPARuleConfig.CompositeFormula is set.
+                          type: string
+                      required:
+                      - type
+                      type: object
+                    type: array
                   minReplicas:
                     description: MinReplicas is the minimum number of replicas
                     format: int32
                     type: integer
                   primaryMetric:
-                    description: PrimaryMetric is the primary metric used for HPA
-                      scaling decisions
+                    description: |-
+                      PrimaryMetric is the primary metric used for HPA scaling decisions.
+                      Legacy single-metric fallback — used when Metrics is empty.
                     type: string
                   scaleDownCooldownSeconds:
                     description: ScaleDownCooldownSeconds is the cooldown period after
@@ -1572,8 +1934,9 @@ spec:
                     format: int32
                     type: integer
                   targetUtilization:
-                    description: TargetUtilization is the target average utilization
-                      for the primary metric (e.g., "0.70" for 70%)
+                    description: |-
+                      TargetUtilization is the target average utilization for the primary metric (e.g., "0.70" for 70%).
+                      Legacy single-metric fallback — used when Metrics is empty.
                     type: string
                 required:
                 - enabled
@@ -1582,6 +1945,10 @@ spec:
                 description: Kind is the Kubernetes object kind (Deployment, StatefulSet,
                   etc.)
                 type: string
+              liveMigrationEnabled:
+                description: LiveMigrationEnabled enables live migration for this
+                  workload
+                type: boolean
               memoryRule:
                 description: Memory Rule Configuration
                 properties:
@@ -1693,6 +2060,12 @@ spec:
                 description: RuleID is the control plane's UUID for this rule (for
                   tracking/linking)
                 type: string
+              schedulerPlugins:
+                description: SchedulerPlugins is an ordered list of scheduler plugins
+                  (e.g., "dz-scheduler")
+                items:
+                  type: string
+                type: array
               startupPeriodSeconds:
                 description: StartupPeriodSeconds is the duration to wait before applying
                   rules after pod startup
