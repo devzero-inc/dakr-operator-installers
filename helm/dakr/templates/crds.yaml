@@ -1134,6 +1134,168 @@ spec:
               namespace:
                 description: Namespace is the namespace of the target workload
                 type: string
+              podRecommendations:
+                description: |-
+                  PodRecommendations contains per-pod resource overrides for in-place vertical scaling.
+                  When present, InPlaceResizeService applies these per-pod values instead of the
+                  uniform ContainerRecommendations. Pods not listed here get the workload-level
+                  ContainerRecommendations as fallback.
+                  The workload template (Deployment/StatefulSet spec) is always updated with the
+                  aggregated ContainerRecommendations, not the per-pod values.
+                items:
+                  description: PodRecommendationSpec contains resource recommendations
+                    for a specific pod.
+                  properties:
+                    containerRecommendations:
+                      description: ContainerRecommendations contains the per-container
+                        resource recommendations for this pod
+                      items:
+                        description: |-
+                          ContainerRecommendationSpec is a plain Go struct for CRD serialization
+                          replaces ContainerRecommendationWrapper
+                        properties:
+                          containerName:
+                            type: string
+                          cpuLimitsAdjustmentEnabled:
+                            description: CpuLimitsAdjustmentEnabled indicates if the
+                              policy allows CPU limits to be adjusted
+                            type: boolean
+                          cpuLimitsRemovalEnabled:
+                            description: CpuLimitsRemovalEnabled indicates if the
+                              policy allows CPU limits to be actively removed
+                            type: boolean
+                          currentLimit:
+                            properties:
+                              cpu:
+                                format: int64
+                                type: integer
+                              cpuAction:
+                                type: string
+                              gpu:
+                                format: int64
+                                type: integer
+                              gpuAction:
+                                type: string
+                              gpuVram:
+                                format: int64
+                                type: integer
+                              gpuVramAction:
+                                type: string
+                              memAction:
+                                type: string
+                              memory:
+                                format: int64
+                                type: integer
+                            type: object
+                          currentRequest:
+                            properties:
+                              cpu:
+                                format: int64
+                                type: integer
+                              cpuAction:
+                                type: string
+                              gpu:
+                                format: int64
+                                type: integer
+                              gpuAction:
+                                type: string
+                              gpuVram:
+                                format: int64
+                                type: integer
+                              gpuVramAction:
+                                type: string
+                              memAction:
+                                type: string
+                              memory:
+                                format: int64
+                                type: integer
+                            type: object
+                          maxCpu:
+                            description: MaxCpu is the maximum allowed CPU limit in
+                              millicores
+                            format: int64
+                            type: integer
+                          maxMemory:
+                            description: MaxMemory is the maximum allowed Memory limit
+                              in bytes
+                            format: int64
+                            type: integer
+                          memoryLimitsAdjustmentEnabled:
+                            description: MemoryLimitsAdjustmentEnabled indicates if
+                              the policy allows Memory limits to be adjusted
+                            type: boolean
+                          minCpu:
+                            description: MinCpu is the minimum allowed CPU limit in
+                              millicores
+                            format: int64
+                            type: integer
+                          minMemory:
+                            description: MinMemory is the minimum allowed Memory limit
+                              in bytes
+                            format: int64
+                            type: integer
+                          optimizationScore:
+                            description: OptimizationScore is the score of the recommendation
+                            type: number
+                          recommendedLimit:
+                            description: RecommendedLimit contains the recommended
+                              resource limits
+                            properties:
+                              cpu:
+                                format: int64
+                                type: integer
+                              cpuAction:
+                                type: string
+                              gpu:
+                                format: int64
+                                type: integer
+                              gpuAction:
+                                type: string
+                              gpuVram:
+                                format: int64
+                                type: integer
+                              gpuVramAction:
+                                type: string
+                              memAction:
+                                type: string
+                              memory:
+                                format: int64
+                                type: integer
+                            type: object
+                          recommendedRequest:
+                            properties:
+                              cpu:
+                                format: int64
+                                type: integer
+                              cpuAction:
+                                type: string
+                              gpu:
+                                format: int64
+                                type: integer
+                              gpuAction:
+                                type: string
+                              gpuVram:
+                                format: int64
+                                type: integer
+                              gpuVramAction:
+                                type: string
+                              memAction:
+                                type: string
+                              memory:
+                                format: int64
+                                type: integer
+                            type: object
+                        required:
+                        - containerName
+                        type: object
+                      type: array
+                    podName:
+                      description: PodName is the name of the target pod
+                      type: string
+                  required:
+                  - podName
+                  type: object
+                type: array
               policyId:
                 description: PolicyID is the control plane's UUID for the policy that
                   generated this recommendation
@@ -2184,6 +2346,10 @@ spec:
                         bumped to (if EmergencyReaction is true)
                       format: int64
                       type: integer
+                    podName:
+                      description: PodName is the pod where the CPU throttle occurred
+                        (set when per-pod tracking is active)
+                      type: string
                     ruleGeneration:
                       description: RuleGeneration is the WorkloadRule spec.generation
                         that was active
@@ -2301,6 +2467,10 @@ spec:
                         bumped to (if EmergencyReaction is true)
                       format: int64
                       type: integer
+                    podName:
+                      description: PodName is the pod where the OOM kill occurred
+                        (set when per-pod tracking is active)
+                      type: string
                     restartCount:
                       description: RestartCount is the container's restart count at
                         the time of the OOM event
