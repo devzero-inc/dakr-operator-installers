@@ -108,6 +108,13 @@ rules:
 - apiGroups: ["dakr.devzero.io"]
   resources: ["workloadrecommendations/finalizers", "nodegrouprecommendations/finalizers", "genericresourcerecommendations/finalizers", "workloadrules/finalizers", "pvcrecommendations/finalizers"]
   verbs: ["update"]
+# WorkloadProfile CRs are reconciled by the profile stream reconciler + janitor
+- apiGroups: ["dakr.devzero.io"]
+  resources: ["workloadprofiles"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["dakr.devzero.io"]
+  resources: ["workloadprofiles/status"]
+  verbs: ["get", "update", "patch"]
 # PVC resources - needed for PVC resize and shrink migration
 - apiGroups: [""]
   resources: ["persistentvolumeclaims"]
