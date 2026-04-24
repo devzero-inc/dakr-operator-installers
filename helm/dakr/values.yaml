@@ -159,18 +159,6 @@ operator:
 scheduler:
   image:
     tag: "v0.0.6"
-  nodeCost:
-    controlPlaneAddress: "https://dakr.devzero.io"
-    controlPlaneToken: "" # Required: Authentication token for DAKR control plane (same as operator.clusterToken)
-    # tokenFromSecret: # If controlPlaneToken is not specified above, scheduler will read from below Secret value (higher priority than ConfigMap)
-    #   name: "devzero-zxporter-token"      # Name of the Secret (must be in kube-system namespace where scheduler runs)
-    #   key: "CLUSTER_TOKEN"                # Key in the Secret's data to get the token
-    #   # NOTE: This matches the Secret created by zxporter (devzero-zxporter-token). Scheduler runs in kube-system namespace.
-    #   # If zxporter creates Secret in devzero-zxporter namespace, the Secret must be recreated in kube-system namespace.
-    # tokenFromConfigMap: # If controlPlaneToken is not specified above and not found in Secret, scheduler will read from below ConfigMap value
-    #   name: "devzero-zxporter-env-config" # Name of the ConfigMap
-    #   namespace: "devzero-zxporter"       # Namespace of the ConfigMap
-    #   key: "CLUSTER_TOKEN"                # Key in the ConfigMap's data to get the token
 
   # Pod scheduling configuration
   nodeSelector:

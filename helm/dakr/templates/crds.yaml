@@ -2238,6 +2238,22 @@ spec:
                 - processedPods
                 - totalPods
                 type: object
+              workloadOriginalUpdateStrategy:
+                description: |-
+                  WorkloadOriginalUpdateStrategy records the StatefulSet/DaemonSet update
+                  strategy that was in effect before the reconciler switched it to OnDelete.
+                  Non-empty means "we owe a strategy restore": every reconcile cycle with
+                  a terminal phase and a non-empty value will re-issue the restore until
+                  it succeeds. Cleared only after the restore lands.
+                type: string
+              workloadPaused:
+                description: |-
+                  WorkloadPaused is true while the reconciler has spec.paused=true set on
+                  the target Deployment to freeze rolling updates during a rolling checkpoint.
+                  Treated as durable "we owe an unpause" state: every reconcile cycle with
+                  a terminal phase and this flag set will re-issue the unpause until it
+                  succeeds. Cleared only after the unpause lands.
+                type: boolean
             type: object
         type: object
     served: true
