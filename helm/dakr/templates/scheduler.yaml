@@ -347,25 +347,10 @@ data:
           args:
             memoryAllocatedPercent: 99
             cpuAllocatedPercent: 99
-        - name: LimitOverProvisionControl 
+        - name: LimitOverProvisionControl
           args:
             cpuOverProvisionPenalizeRatio: 180
             memoryOverProvisionPenalizeRatio: 180
-        - name: NodeCost
-          args:
-            controlPlaneAddress: {{ .Values.scheduler.nodeCost.controlPlaneAddress | quote }}
-            controlPlaneToken: {{ .Values.scheduler.nodeCost.controlPlaneToken | quote }}
-            {{- if .Values.scheduler.nodeCost.tokenFromSecret }}
-            tokenFromSecret:
-              name: {{ .Values.scheduler.nodeCost.tokenFromSecret.name | quote }}
-              key: {{ .Values.scheduler.nodeCost.tokenFromSecret.key | quote }}
-            {{- end }}
-            {{- if .Values.scheduler.nodeCost.tokenFromConfigMap }}
-            tokenFromConfigMap:
-              name: {{ .Values.scheduler.nodeCost.tokenFromConfigMap.name | quote }}
-              namespace: {{ .Values.scheduler.nodeCost.tokenFromConfigMap.namespace | quote }}
-              key: {{ .Values.scheduler.nodeCost.tokenFromConfigMap.key | quote }}
-            {{- end }}
         - name: PodTopologySpread
           args:
             defaultingType: "List"
@@ -387,8 +372,6 @@ data:
               weight: 3
             - name: 'LimitOverProvisionControl'
               weight: 2
-            - name: 'NodeCost'
-              weight: 4
             disabled:
             - name: 'NodeResourcesFit'
             - name: 'NodeResourcesBalancedAllocation'
@@ -408,8 +391,6 @@ data:
               weight: 3
             - name: 'LimitOverProvisionControl'
               weight: 2
-            - name: 'NodeCost'
-              weight: 4
             disabled:
             - name: 'NodeResourcesFit'
             - name: 'NodeResourcesBalancedAllocation'
@@ -457,15 +438,6 @@ spec:
         - --config=/etc/kubernetes/dz-scheduler/dz-scheduler-config.yaml
         - --feature-gates=DynamicResourceAllocation=false
         image: "{{ .Values.image.repository }}/dzk8scheduler:{{ .Values.scheduler.image.tag }}"
-        {{- if .Values.scheduler.nodeCost.tokenFromSecret }}
-        env:
-          - name: CONTROL_PLANE_TOKEN_FROM_SECRET
-            valueFrom:
-              secretKeyRef:
-                name: {{ .Values.scheduler.nodeCost.tokenFromSecret.name | quote }}
-                key: {{ .Values.scheduler.nodeCost.tokenFromSecret.key | quote }}
-                optional: true
-        {{- end }}
         livenessProbe:
           httpGet:
             path: /healthz
