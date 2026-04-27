@@ -3,7 +3,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: dz-scheduler
-  namespace: {{ .Release.Namespace }}
+  namespace: kube-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -242,7 +242,7 @@ metadata:
 subjects:
 - kind: ServiceAccount
   name: dz-scheduler
-  namespace: {{ .Release.Namespace }}
+  namespace: kube-system
 roleRef:
   kind: ClusterRole
   name: dz-scheduler-kube-scheduler
@@ -289,7 +289,7 @@ metadata:
 subjects:
 - kind: ServiceAccount
   name: dz-scheduler
-  namespace: {{ .Release.Namespace }}
+  namespace: kube-system
 roleRef:
   kind: ClusterRole
   name: dz-scheduler-volume-scheduler
@@ -307,7 +307,7 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: dz-scheduler
-  namespace: {{ .Release.Namespace }}
+  namespace: kube-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -325,7 +325,7 @@ metadata:
 subjects:
 - kind: ServiceAccount
   name: dz-scheduler
-  namespace: {{ .Release.Namespace }}
+  namespace: kube-system
 roleRef:
   kind: ClusterRole
   name: dz-scheduler-configmap-reader
@@ -335,7 +335,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: dz-scheduler-config
-  namespace: {{ .Release.Namespace }}
+  namespace: kube-system
 data:
   dz-scheduler-config.yaml: |
     apiVersion: kubescheduler.config.k8s.io/v1
@@ -347,25 +347,10 @@ data:
           args:
             memoryAllocatedPercent: 99
             cpuAllocatedPercent: 99
-        - name: LimitOverProvisionControl 
+        - name: LimitOverProvisionControl
           args:
             cpuOverProvisionPenalizeRatio: 180
             memoryOverProvisionPenalizeRatio: 180
-        - name: NodeCost
-          args:
-            controlPlaneAddress: {{ .Values.scheduler.nodeCost.controlPlaneAddress | quote }}
-            controlPlaneToken: {{ .Values.scheduler.nodeCost.controlPlaneToken | quote }}
-            {{- if .Values.scheduler.nodeCost.tokenFromSecret }}
-            tokenFromSecret:
-              name: {{ .Values.scheduler.nodeCost.tokenFromSecret.name | quote }}
-              key: {{ .Values.scheduler.nodeCost.tokenFromSecret.key | quote }}
-            {{- end }}
-            {{- if .Values.scheduler.nodeCost.tokenFromConfigMap }}
-            tokenFromConfigMap:
-              name: {{ .Values.scheduler.nodeCost.tokenFromConfigMap.name | quote }}
-              namespace: {{ .Values.scheduler.nodeCost.tokenFromConfigMap.namespace | quote }}
-              key: {{ .Values.scheduler.nodeCost.tokenFromConfigMap.key | quote }}
-            {{- end }}
         - name: PodTopologySpread
           args:
             defaultingType: "List"
@@ -387,8 +372,6 @@ data:
               weight: 3
             - name: 'LimitOverProvisionControl'
               weight: 2
-            - name: 'NodeCost'
-              weight: 4
             disabled:
             - name: 'NodeResourcesFit'
             - name: 'NodeResourcesBalancedAllocation'
@@ -408,8 +391,6 @@ data:
               weight: 3
             - name: 'LimitOverProvisionControl'
               weight: 2
-            - name: 'NodeCost'
-              weight: 4
             disabled:
             - name: 'NodeResourcesFit'
             - name: 'NodeResourcesBalancedAllocation'
@@ -423,7 +404,7 @@ metadata:
     component: scheduler
     tier: control-plane
   name: dz-scheduler
-  namespace: {{ .Release.Namespace }}
+  namespace: kube-system
 spec:
   selector:
     matchLabels:
@@ -457,15 +438,6 @@ spec:
         - --config=/etc/kubernetes/dz-scheduler/dz-scheduler-config.yaml
         - --feature-gates=DynamicResourceAllocation=false
         image: "{{ .Values.image.repository }}/dzk8scheduler:{{ .Values.scheduler.image.tag }}"
-        {{- if .Values.scheduler.nodeCost.tokenFromSecret }}
-        env:
-          - name: CONTROL_PLANE_TOKEN_FROM_SECRET
-            valueFrom:
-              secretKeyRef:
-                name: {{ .Values.scheduler.nodeCost.tokenFromSecret.name | quote }}
-                key: {{ .Values.scheduler.nodeCost.tokenFromSecret.key | quote }}
-                optional: true
-        {{- end }}
         livenessProbe:
           httpGet:
             path: /healthz
@@ -498,7 +470,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: dz-scheduler
-  namespace: {{ .Release.Namespace }}
+  namespace: kube-system
   labels:
     component: scheduler
     tier: control-plane
