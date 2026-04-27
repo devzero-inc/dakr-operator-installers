@@ -13,7 +13,7 @@ To learn more about the release, try:
 NOTE: No explicit cluster token configuration detected.
 
 The DAKR operator will automatically attempt to read the cluster token from the zxporter
-installation if both are installed in the same namespace (typically devzero-zxporter).
+installation if both are installed in the same namespace (typically devzero-system).
 
 If DAKR is installed in a different namespace or automatic discovery fails, you'll need to:
 1. Set operator.clusterToken in your values
