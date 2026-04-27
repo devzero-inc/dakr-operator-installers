@@ -44,7 +44,7 @@ operator:
       cpu: 10m
       memory: 64Mi
   endpoint: "https://dakr.devzero.io"
-  zxporterAddr: "devzero-zxporter-controller-manager-mpa.devzero-zxporter.svc.cluster.local:50051"
+  zxporterAddr: "devzero-zxporter-controller-manager-mpa.devzero-system.svc.cluster.local:50051"
   # Log level for the operator. Available levels:
   # - debug: Most verbose, includes debug messages
   # - info: Informational messages
@@ -65,11 +65,11 @@ operator:
   #   # the Secret must be recreated in the operator's namespace. Alternatively, install both in the same namespace.
   # tokenFromConfigMap: # If clusterToken is not specified above and not found in Secret, operator will read from below ConfigMap value
   #   name: "devzero-zxporter-env-config" # Name of the ConfigMap
-  #   namespace: "devzero-zxporter" # Namespace of the ConfigMap
+  #   namespace: "devzero-system" # Namespace of the ConfigMap
   #   key: "CLUSTER_TOKEN" # Key in the ConfigMap's data to get the token
   # nameFromConfigMap: # If clusterName is not specified above and not found in Secret, operator will read from below ConfigMap value
   #   name: "devzero-zxporter-env-config" # Name of the ConfigMap
-  #   namespace: "devzero-zxporter"       # Namespace of the ConfigMap
+  #   namespace: "devzero-system"       # Namespace of the ConfigMap
   #   key: "KUBE_CONTEXT_NAME"            # Key in the ConfigMap's data to get the cluster name from
   customScheduler: false
   port: 9443
@@ -169,7 +169,7 @@ scheduler:
     #   # If zxporter creates Secret in devzero-zxporter namespace, the Secret must be recreated in kube-system namespace.
     # tokenFromConfigMap: # If controlPlaneToken is not specified above and not found in Secret, scheduler will read from below ConfigMap value
     #   name: "devzero-zxporter-env-config" # Name of the ConfigMap
-    #   namespace: "devzero-zxporter"       # Namespace of the ConfigMap
+    #   namespace: "devzero-system"         # Namespace of the ConfigMap
     #   key: "CLUSTER_TOKEN"                # Key in the ConfigMap's data to get the token
 
   # Pod scheduling configuration
