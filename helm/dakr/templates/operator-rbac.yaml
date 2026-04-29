@@ -176,6 +176,13 @@ rules:
 - apiGroups: ["karpenter.sh"]
   resources: ["machines", "nodeclaims", "nodepools", "provisioners"]
   verbs: ["get", "list", "watch", "update", "patch", "create", "delete"]
+# DevZero Karpenter extensions
+- apiGroups: ["devzero.karpenter.sh"]
+  resources: ["karpentersettings"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["devzero.karpenter.sh"]
+  resources: ["karpentersettings/status"]
+  verbs: ["get", "update", "patch"]
 # AWS Karpenter resources
 - apiGroups: ["karpenter.k8s.aws"]
   resources: ["awsnodetemplates", "ec2nodeclasses"]
