@@ -57,7 +57,9 @@ webhooks:
         name: {{ include "dakr.fullname" . }}-operator
         path: /mutate
         port: {{ .Values.operator.port | default 9443 }}
+      {{- if .Values.webhook.caBundle }}
       caBundle: {{ .Values.webhook.caBundle }}
+      {{- end }}
     admissionReviewVersions: ["v1"]
     sideEffects: None
     timeoutSeconds: 2
@@ -130,7 +132,9 @@ webhooks:
         name: {{ include "dakr.fullname" . }}-operator
         path: /validate
         port: {{ .Values.operator.port | default 9443 }}
+      {{- if .Values.webhook.caBundle }}
       caBundle: {{ .Values.webhook.caBundle }}
+      {{- end }}
     admissionReviewVersions: ["v1"]
     sideEffects: None
     timeoutSeconds: 5
@@ -166,7 +170,9 @@ webhooks:
         name: {{ include "dakr.fullname" . }}-operator
         path: /validate-eviction
         port: {{ .Values.operator.port | default 9443 }}
+      {{- if .Values.webhook.caBundle }}
       caBundle: {{ .Values.webhook.caBundle }}
+      {{- end }}
     admissionReviewVersions: ["v1", "v1beta1"]
     sideEffects: None
     timeoutSeconds: 10
