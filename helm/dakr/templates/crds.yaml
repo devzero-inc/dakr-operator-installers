@@ -412,6 +412,7 @@ spec:
                 - Skipped
                 - Migrating
                 - InPlaceScaling
+                - Rejected
                 type: string
             type: object
         type: object
@@ -595,6 +596,7 @@ spec:
                 - Skipped
                 - Migrating
                 - InPlaceScaling
+                - Rejected
                 type: string
             type: object
         type: object
@@ -780,6 +782,7 @@ spec:
                 - Skipped
                 - Migrating
                 - InPlaceScaling
+                - Rejected
                 type: string
               shrinkPhase:
                 description: Shrink migration tracking
@@ -1847,7 +1850,7 @@ spec:
                 description: LiveMigDeletionProp is set for when UseLiveMigration:true
                   and indicates how the snapshotted container should be handled.
                 enum:
-                - Orphaned
+                - Orphan
                 - Foreground
                 - Background
                 type: string
@@ -2178,6 +2181,7 @@ spec:
                 - Skipped
                 - Migrating
                 - InPlaceScaling
+                - Rejected
                 type: string
               rollingCheckpoint:
                 description: |-

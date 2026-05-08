@@ -100,7 +100,7 @@ spec:
           - name: TOKEN_CONFIGMAP_NAME
             value: {{ .Values.operator.tokenFromConfigMap.name | quote }}
           - name: TOKEN_CONFIGMAP_NAMESPACE
-            value: {{ .Values.operator.tokenFromConfigMap.namespace | quote }}
+            value: {{ .Values.operator.tokenFromConfigMap.namespace | default .Release.Namespace | quote }}
           - name: TOKEN_CONFIGMAP_KEY
             value: {{ .Values.operator.tokenFromConfigMap.key | quote }}
           {{- end }}
@@ -108,7 +108,7 @@ spec:
           - name: CLUSTER_NAME_CONFIGMAP_NAME
             value: {{ .Values.operator.nameFromConfigMap.name | quote }}
           - name: CLUSTER_NAME_CONFIGMAP_NAMESPACE
-            value: {{ .Values.operator.nameFromConfigMap.namespace | quote }}
+            value: {{ .Values.operator.nameFromConfigMap.namespace | default .Release.Namespace | quote }}
           - name: CLUSTER_NAME_CONFIGMAP_KEY
             value: {{ .Values.operator.nameFromConfigMap.key | quote }}
           {{- end }}
