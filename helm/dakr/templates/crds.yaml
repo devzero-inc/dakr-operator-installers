@@ -2050,6 +2050,13 @@ spec:
                 description: ReplicaCount is the recommended replica count
                 format: int32
                 type: integer
+              replicaCountAction:
+                description: |-
+                  ReplicaCountAction indicates how the operator should treat ReplicaCount.
+                  When Ignore, the operator must not modify the workload's spec.replicas
+                  (so user/HPA-driven changes are preserved). When Set or empty (default for
+                  backwards compatibility), the operator applies ReplicaCount.
+                type: string
               ruleId:
                 description: RuleID is the control plane's UUID for the WorkloadRule
                   that generated this recommendation
@@ -2812,6 +2819,48 @@ spec:
                       description: HPAMetricTrigger defines a single metric source
                         and its scaling target for multi-metric HPA.
                       properties:
+                        activationThreshold:
+                          description: |-
+                            ActivationThreshold is the minimum metric value to consider this scaler "active".
+                            Below this threshold, the scaler reports IsActive=false.
+                            Defaults to "0" (always active if metric is retrievable).
+                          type: string
+                        authSecretRef:
+                          description: |-
+                            AuthSecretRef references a Kubernetes Secret containing authentication credentials
+                            for the external metric source. All keys from the Secret are available to the scaler.
+                            The Secret must be in the same namespace as the WorkloadRule.
+                          properties:
+                            name:
+                              description: Name of the Secret in the same namespace
+                                as the WorkloadRule.
+                              type: string
+                          required:
+                          - name
+                          type: object
+                        metadata:
+                          additionalProperties:
+                            type: string
+                          description: |-
+                            Metadata is a free-form key-value map for external scaler configuration.
+                            Each scaler type defines its own expected keys.
+                            Example for prometheus: {"serverAddress": "http://prom:9090", "query": "rate(http_requests[5m])"}
+                            Ignored for built-in resource scalers (CPU, Memory, Network).
+                          type: object
+                        metricTargetType:
+                          description: |-
+                            MetricTargetType determines how the metric value is interpreted for scaling.
+                            "Value" — absolute target (e.g., total queue length = 100)
+                            "AverageValue" — per-pod target (e.g., 50 requests per pod)
+                            Defaults to "Value" for external scalers. Ignored for resource scalers.
+                          type: string
+                        pollingInterval:
+                          description: |-
+                            PollingInterval overrides the default 30s evaluation interval for this trigger (seconds).
+                            Useful for rate-limited external APIs (e.g., poll Datadog every 60s).
+                            Minimum: 10 seconds.
+                          format: int32
+                          type: integer
                         targetUtilization:
                           description: |-
                             TargetUtilization is the target average utilization as a fraction (0.0-1.0).
@@ -2819,12 +2868,14 @@ spec:
                           type: string
                         targetValue:
                           description: |-
-                            TargetValue is the target absolute value (e.g., bytes/sec for network metrics).
-                            Used for absolute metrics (NetworkIngress, NetworkEgress).
+                            TargetValue is the target absolute value (e.g., bytes/sec for network, queue depth, request rate).
+                            Used for absolute metrics (network scalers and all external scalers).
                           type: string
                         type:
-                          description: Type is the metric type (CPU, Memory, NetworkIngress,
-                            NetworkEgress)
+                          description: |-
+                            Type is the metric type.
+                            Built-in resource types: "CPU", "Memory", "NetworkIngress", "NetworkEgress"
+                            External types: "prometheus", "datadog", "http", "redis", "kafka", "cron", "external-grpc"
                           type: string
                         weight:
                           description: |-
