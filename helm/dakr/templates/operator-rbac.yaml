@@ -48,6 +48,9 @@ rules:
   resources: ["pods/resize"]
   verbs: ["get", "patch"]
 # Node access - configurable based on security settings
+# patch is required for SSA on Node labels/taints from the
+# GenericResourceRecommendation reconciler (Node patch allowlist enforces
+# dakr.devzero.io/* keys).
 - apiGroups: [""]
   resources: ["nodes"]
   verbs:
@@ -56,12 +59,14 @@ rules:
     - "list"
     - "watch"
     - "update"
+    - "patch"
     - "delete"
   {{- else }}
     - "get"
     - "list"
     - "watch"
     - "update"
+    - "patch"
   {{- end }}
 - apiGroups: [""]
   resources: ["nodes/status"]
