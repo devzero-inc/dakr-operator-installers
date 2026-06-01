@@ -17,12 +17,9 @@ image:
   # This sets the pull policy for images.
   pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "v0.0.68"
+  tag: "v0.0.69"
 
 imagePullSecrets: []
-
-mpaController:
-  enabled: false
 
 operator:
   enabled: true
@@ -189,6 +186,9 @@ agent:
     requests:
       cpu: 100m
       memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
   runtime: "containerd" # containerd/k3s/rke2
   # control whether to checkpoint and restore kubelet logs (default: false)
   checkpointKubeletLogs: true
