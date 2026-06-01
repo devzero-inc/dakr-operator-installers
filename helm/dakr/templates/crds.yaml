@@ -1769,10 +1769,6 @@ spec:
                   - PodEviction
                   type: string
                 type: array
-              enableInClusterMpa:
-                description: EnableInClusterMpa indicates if the In-Cluster MPA (Fast
-                  Reaction) controller should manage this workload
-                type: boolean
               kedaScaledObjects:
                 description: KEDAScaledObjects contains the list of KEDA scaling configuration
                   recommendations
