@@ -1,0 +1,69 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Supplemental permissions for upgrading dzKarp to v1.7.17 (based on upstream karpenter v1.13.0).
+  Run this if you previously deployed the base cloudformation.yaml and need the additional
+  IAM permissions and EventBridge rules required by the new version.
+Parameters:
+  ClusterName:
+    Type: String
+    Description: "EKS cluster name (must match the value used in the original cloudformation.yaml)"
+Resources:
+  KarpenterV1717UpdatePolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub "KarpenterControllerPolicy-${ClusterName}-v1717-update"
+      Roles:
+        - !Sub "KarpenterControllerRole-${ClusterName}"
+      PolicyDocument: !Sub |
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "AllowPlacementGroupEC2Actions",
+              "Effect": "Allow",
+              "Resource": "arn:${AWS::Partition}:ec2:${AWS::Region}:*:placement-group/*",
+              "Action": [
+                "ec2:RunInstances",
+                "ec2:CreateFleet"
+              ]
+            },
+            {
+              "Sid": "AllowNewRegionalReadActions",
+              "Effect": "Allow",
+              "Resource": "*",
+              "Action": [
+                "ec2:DescribeInstanceStatus",
+                "ec2:DescribePlacementGroups"
+              ],
+              "Condition": {
+                "StringEquals": {
+                  "aws:RequestedRegion": "${AWS::Region}"
+                }
+              }
+            },
+            {
+              "Sid": "AllowZonalShiftStatusReadOnly",
+              "Effect": "Allow",
+              "Resource": "*",
+              "Action": [
+                "arc-zonal-shift:GetManagedResource"
+              ],
+              "Condition": {
+                "StringEquals": {
+                  "arc-zonal-shift:ResourceIdentifier": "arn:${AWS::Partition}:eks:${AWS::Region}:${AWS::AccountId}:cluster/${ClusterName}"
+                }
+              }
+            }
+          ]
+        }
+  CapacityReservationInterruptionRule:
+    Type: 'AWS::Events::Rule'
+    Properties:
+      EventPattern:
+        source:
+          - aws.ec2
+        detail-type:
+          - EC2 Capacity Reservation Instance Interruption Warning
+      Targets:
+        - Id: KarpenterInterruptionQueueTarget
+          Arn: !Sub "arn:${AWS::Partition}:sqs:${AWS::Region}:${AWS::AccountId}:${ClusterName}"
