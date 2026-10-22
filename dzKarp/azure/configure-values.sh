@@ -39,7 +39,14 @@ TOKEN_ID=$(kubectl get -n kube-system secret "$TOKEN_SECRET_NAME" -o jsonpath='{
 TOKEN_SECRET=$(kubectl get -n kube-system secret "$TOKEN_SECRET_NAME" -o jsonpath='{.data.token-secret}' | base64 -d)
 BOOTSTRAP_TOKEN=$TOKEN_ID.$TOKEN_SECRET
 
-SSH_PUBLIC_KEY="$(cat ~/.ssh/id_rsa.pub) azureuser"
+# Node SSH key: use the cluster's own linuxProfile key so Karpenter nodes carry the same
+# break-glass key as every other AKS node and rotate with it (az aks update --ssh-key-value).
+# Fall back to the local id_rsa.pub only for clusters that have no linuxProfile key.
+SSH_PUBLIC_KEY="$(jq -r '.linuxProfile.ssh.publicKeys[0].keyData // empty' <<< "$AKS_JSON")"
+if [ -z "$SSH_PUBLIC_KEY" ]; then
+    SSH_PUBLIC_KEY="$(cat ~/.ssh/id_rsa.pub)"
+fi
+SSH_PUBLIC_KEY="$SSH_PUBLIC_KEY azureuser"
 
 
 get_vnet_json() {
