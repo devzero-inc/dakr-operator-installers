@@ -39,8 +39,17 @@ Resources:
             }
           ]
         }
+      # Both controller policies are new resources with new names, listed here
+      # only. On a stack update from the single KarpenterControllerPolicy, they
+      # are created first, this role then swaps its list from the old policy to
+      # them in one update, and the old policy is deleted only in the cleanup
+      # phase after that. Shrinking the old policy in place instead would leave
+      # the controller without the moved permissions until the second policy
+      # was attached; attaching that one through its own Roles: and ordering the
+      # shrink after it is a dependency cycle while this role lists the first.
       ManagedPolicyArns:
-        - !Ref KarpenterControllerPolicy
+        - !Ref KarpenterControllerNodeLifecyclePolicy
+        - !Ref KarpenterControllerIntegrationPolicy
   KarpenterNodeRole:
     Type: "AWS::IAM::Role"
     Properties:
@@ -60,10 +69,11 @@ Resources:
         - !Sub "arn:${AWS::Partition}:iam::aws:policy/AmazonEKSWorkerNodePolicy"
         - !Sub "arn:${AWS::Partition}:iam::aws:policy/AmazonEC2ContainerRegistryPullOnly"
         - !Sub "arn:${AWS::Partition}:iam::aws:policy/AmazonSSMManagedInstanceCore"
-  KarpenterControllerPolicy:
+  KarpenterControllerNodeLifecyclePolicy:
     Type: AWS::IAM::ManagedPolicy
     Properties:
-      ManagedPolicyName: !Sub "KarpenterControllerPolicy-${ClusterName}"
+      ManagedPolicyName: !Sub "KarpenterControllerNodeLifecyclePolicy-${ClusterName}"
+      # EC2 node lifecycle grants; the rest are in KarpenterControllerIntegrationPolicy.
       # The PolicyDocument must be in JSON string format because we use a StringEquals condition that uses an interpolated
       # value in one of its key parameters which isn't natively supported by CloudFormation
       PolicyDocument: !Sub |
@@ -201,7 +211,23 @@ Resources:
                   "aws:ResourceTag/karpenter.sh/nodepool": "*"
                 }
               }
-            },
+            }
+          ]
+        }
+  # Split in two because IAM caps a managed policy at 6,144 characters
+  # (whitespace excluded): as one document the controller policy grew past
+  # that for every cluster name ("Cannot exceed quota for PolicySize: 6144").
+  # KarpenterControllerNodeLifecyclePolicy holds the EC2 launch/tag/delete grants; this one
+  # holds discovery, pricing, interruption, instance-profile and EKS grants.
+  # Both are attached to KarpenterControllerRole.
+  KarpenterControllerIntegrationPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub "KarpenterControllerIntegrationPolicy-${ClusterName}"
+      PolicyDocument: !Sub |
+        {
+          "Version": "2012-10-17",
+          "Statement": [
             {
               "Sid": "AllowRegionalReadActions",
               "Effect": "Allow",
