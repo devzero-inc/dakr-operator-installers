@@ -41,6 +41,7 @@ Resources:
         }
       ManagedPolicyArns:
         - !Ref KarpenterControllerPolicy
+        - !Ref KarpenterControllerIntegrationPolicy
   KarpenterNodeRole:
     Type: "AWS::IAM::Role"
     Properties:
@@ -64,6 +65,7 @@ Resources:
     Type: AWS::IAM::ManagedPolicy
     Properties:
       ManagedPolicyName: !Sub "KarpenterControllerPolicy-${ClusterName}"
+      # EC2 node lifecycle grants; the rest are in KarpenterControllerIntegrationPolicy.
       # The PolicyDocument must be in JSON string format because we use a StringEquals condition that uses an interpolated
       # value in one of its key parameters which isn't natively supported by CloudFormation
       PolicyDocument: !Sub |
@@ -201,7 +203,23 @@ Resources:
                   "aws:ResourceTag/karpenter.sh/nodepool": "*"
                 }
               }
-            },
+            }
+          ]
+        }
+  # Split in two because IAM caps a managed policy at 6,144 characters
+  # (whitespace excluded): as one document the controller policy grew past
+  # that for every cluster name ("Cannot exceed quota for PolicySize: 6144").
+  # KarpenterControllerPolicy holds the EC2 launch/tag/delete grants; this one
+  # holds discovery, pricing, interruption, instance-profile and EKS grants.
+  # Both are attached to KarpenterControllerRole.
+  KarpenterControllerIntegrationPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub "KarpenterControllerIntegrationPolicy-${ClusterName}"
+      PolicyDocument: !Sub |
+        {
+          "Version": "2012-10-17",
+          "Statement": [
             {
               "Sid": "AllowRegionalReadActions",
               "Effect": "Allow",
