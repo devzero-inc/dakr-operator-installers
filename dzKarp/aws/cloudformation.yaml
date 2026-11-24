@@ -14,31 +14,52 @@ Parameters:
     Type: String
     Default: "kube-system"
     Description: "The Kubernetes namespace where Karpenter is installed."
+  OIDCIssuerHost:
+    Type: String
+    Default: ""
+    AllowedPattern: "^([a-z0-9.-]+/id/[A-Za-z0-9]+)?$"
+    Description: >-
+      Optional. The cluster's OIDC issuer without "https://", e.g.
+      oidc-eks.us-west-2.api.aws/id/C66D5D54749FA6FAF79C0BA97D88327E. Required for
+      IPv6 clusters, whose issuer is on the dual-stack host oidc-eks.<region>.api.aws.
+      Empty (the default) uses oidc.eks.<AWSRegion>.amazonaws.com/id/<OIDCProviderID>,
+      the issuer of IPv4 clusters.
+Conditions:
+  HasOIDCIssuerHost: !Not [!Equals [!Ref OIDCIssuerHost, ""]]
 Resources:
   KarpenterControllerRole:
     Type: "AWS::IAM::Role"
     Properties:
       RoleName: !Sub "KarpenterControllerRole-${ClusterName}"
       Path: /
-      AssumeRolePolicyDocument: !Sub |
-        {
-          "Version": "2012-10-17",
-          "Statement": [
-            {
-              "Effect": "Allow",
-              "Principal": {
-                "Federated": "arn:${AWS::Partition}:iam::${AWS::AccountId}:oidc-provider/oidc.eks.${AWSRegion}.amazonaws.com/id/${OIDCProviderID}"
-              },
-              "Action": "sts:AssumeRoleWithWebIdentity",
-              "Condition": {
-                "StringEquals": {
-                  "oidc.eks.${AWSRegion}.amazonaws.com/id/${OIDCProviderID}:aud": "sts.amazonaws.com",
-                  "oidc.eks.${AWSRegion}.amazonaws.com/id/${OIDCProviderID}:sub": "system:serviceaccount:${KarpenterNamespace}:karpenter"
+      # The IAM OIDC provider is named after the cluster's issuer. IPv6 clusters
+      # have theirs on the dual-stack host oidc-eks.<region>.api.aws, so it is
+      # taken from OIDCIssuerHost when given:
+      # https://docs.aws.amazon.com/eks/latest/userguide/vpc-interface-endpoints.html#oidc-vpc-endpoint-private-dns
+      AssumeRolePolicyDocument: !Sub
+        - |
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Principal": {
+                  "Federated": "arn:${AWS::Partition}:iam::${AWS::AccountId}:oidc-provider/${OIDCHost}"
+                },
+                "Action": "sts:AssumeRoleWithWebIdentity",
+                "Condition": {
+                  "StringEquals": {
+                    "${OIDCHost}:aud": "sts.amazonaws.com",
+                    "${OIDCHost}:sub": "system:serviceaccount:${KarpenterNamespace}:karpenter"
+                  }
                 }
               }
-            }
-          ]
-        }
+            ]
+          }
+        - OIDCHost: !If
+            - HasOIDCIssuerHost
+            - !Ref OIDCIssuerHost
+            - !Sub "oidc.eks.${AWSRegion}.amazonaws.com/id/${OIDCProviderID}"
       ManagedPolicyArns:
         - !Ref KarpenterControllerPolicy
   KarpenterNodeRole:
